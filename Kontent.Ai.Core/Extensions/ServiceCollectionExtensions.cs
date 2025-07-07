@@ -56,12 +56,51 @@ public static class ServiceCollectionExtensions
     }
 
     /// <summary>
+    /// Registers a resilient HttpClient using configuration from ClientOptions.
+    /// ✅ APPLIES: HttpClientName, BaseUrl, RequestTimeout, MaxRetryAttempts from options automatically.
+    /// This overload respects all ClientOptions properties for complete consistency.
+    /// </summary>
+    /// <typeparam name="TOptions">The options type containing HttpClientName and other configuration.</typeparam>
+    /// <param name="services">The service collection.</param>
+    /// <param name="options">The options containing HttpClientName, BaseUrl, RequestTimeout, MaxRetryAttempts, etc.</param>
+    /// <param name="configureClient">Optional client configuration (applied after options configuration).</param>
+    /// <param name="enableDefaultResilience">Whether to add the default resilience policies.</param>
+    /// <returns>The IHttpClientBuilder for further configuration.</returns>
+    public static IHttpClientBuilder AddBaseHttpClient<TOptions>(
+        this IServiceCollection services,
+        TOptions options,
+        Action<HttpClient>? configureClient = null,
+        bool enableDefaultResilience = true)
+        where TOptions : ClientOptions
+    {
+        return services.AddBaseHttpClient(
+            options.HttpClientName, 
+            client =>
+            {
+                // Apply options configuration first
+                if (!string.IsNullOrEmpty(options.BaseUrl))
+                {
+                    client.BaseAddress = new Uri(options.BaseUrl);
+                }
+                
+                client.Timeout = options.RequestTimeout;
+                
+                // Then apply any additional configuration (can override options if needed)
+                configureClient?.Invoke(client);
+            }, 
+            options.MaxRetryAttempts, 
+            enableDefaultResilience);
+    }
+
+    /// <summary>
     /// Registers a resilient HttpClient with unified Kontent.ai retry policies using options configuration.
     /// This overload allows options-driven configuration of retry attempts.
+    /// ⚠️ NOTE: The 'name' parameter overrides options.HttpClientName. Consider using the overload 
+    /// that takes only TOptions to respect the HttpClientName property.
     /// </summary>
     /// <typeparam name="TOptions">The options type containing MaxRetryAttempts.</typeparam>
     /// <param name="services">The service collection.</param>
-    /// <param name="name">The logical name of the client to configure.</param>
+    /// <param name="name">The logical name of the client to configure (overrides options.HttpClientName).</param>
     /// <param name="options">The options containing MaxRetryAttempts and other configuration.</param>
     /// <param name="configureClient">Optional client configuration.</param>
     /// <param name="enableDefaultResilience">Whether to add the default resilience policies.</param>
@@ -128,7 +167,7 @@ public static class ServiceCollectionExtensions
     /// <param name="services">The service collection.</param>
     /// <param name="lifetime">The service lifetime for the factory.</param>
     /// <returns>The service collection for chaining.</returns>
-    public static IServiceCollection AddKontentClientFactory<TFactory, TClient, TOptions>(
+    public static IServiceCollection AddClientFactory<TFactory, TClient, TOptions>(
         this IServiceCollection services,
         ServiceLifetime lifetime = ServiceLifetime.Scoped)
         where TFactory : class, IClientFactory<TClient, TOptions>
@@ -147,7 +186,7 @@ public static class ServiceCollectionExtensions
     /// <param name="services">The service collection.</param>
     /// <param name="lifetime">The service lifetime for the client.</param>
     /// <returns>The service collection for chaining.</returns>
-    public static IServiceCollection AddKontentClient<TClient>(
+    public static IServiceCollection AddClient<TClient>(
         this IServiceCollection services,
         ServiceLifetime lifetime = ServiceLifetime.Scoped)
         where TClient : class
@@ -222,5 +261,36 @@ public static class ServiceCollectionExtensions
         return services;
     }
 
+    /// <summary>
+    /// Registers a client with HttpClient and ActionInvoker using configuration from ClientOptions.
+    /// This is a convenience method that combines HttpClient registration, ActionInvoker, and client registration.
+    /// ✅ APPLIES: HttpClientName, BaseUrl, RequestTimeout, MaxRetryAttempts from options automatically.
+    /// ⚠️ LIMITATION: If you register multiple clients, use the factory pattern instead as 
+    /// IActionInvoker registration will be overwritten by subsequent registrations.
+    /// </summary>
+    /// <typeparam name="TClient">The client type to register.</typeparam>
+    /// <typeparam name="TOptions">The options type containing HttpClientName and other configuration.</typeparam>
+    /// <param name="services">The service collection.</param>
+    /// <param name="options">The client options instance containing HttpClientName, BaseUrl, RequestTimeout, etc.</param>
+    /// <param name="configureClient">Optional HttpClient configuration (applied after options configuration).</param>
+    /// <param name="lifetime">The service lifetime for the client.</param>
+    /// <returns>The service collection for chaining.</returns>
+    public static IServiceCollection AddClientWithOptions<TClient, TOptions>(
+        this IServiceCollection services,
+        TOptions options,
+        Action<HttpClient>? configureClient = null,
+        ServiceLifetime lifetime = ServiceLifetime.Scoped)
+        where TClient : class
+        where TOptions : ClientOptions
+    {
+        // Register HttpClient with ActionInvoker using all configuration from options
+        services.AddBaseHttpClient(options, configureClient)
+            .AddActionInvoker();
+
+        // Register the client
+        services.AddClient<TClient>(lifetime);
+
+        return services;
+    }
 
 } 
