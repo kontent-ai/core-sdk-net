@@ -220,9 +220,9 @@ public static class ServiceCollectionExtensions
         this IServiceCollection services,
         IConfiguration configuration)
     {
-        services.AddClientOptions<DeliveryClientOptions>(configuration);
+        services.Configure<DeliveryClientOptions>(configuration);
 
-        var options = configuration.Get<DeliveryClientOptions>()!;
+        var options = configuration.Get<DeliveryClientOptions>()!
         return services.AddKontentDelivery(options);
     }
 
@@ -234,7 +234,10 @@ public static class ServiceCollectionExtensions
         IDictionary<string, IConfiguration> configurations)
     {
         // Register multiple named configurations
-        services.AddNamedClientOptions<DeliveryClientOptions>(configurations);
+        foreach (var (name, config) in configurations)
+        {
+            services.Configure<DeliveryClientOptions>(name, config);
+        }
 
         // Register named HttpClients for each configuration
         foreach (var (name, config) in configurations)
@@ -461,8 +464,8 @@ builder.Services.AddKontentDeliveryWithCustomResilience(
 - `AddClientWithOptions<TClient, TOptions>(...)` - All-in-one convenience method
 
 ### **Options Registration**
-- `AddClientOptions<TOptions>(...)` - Single configuration
-- `AddNamedClientOptions<TOptions>(...)` - Multiple named configurations
+- `services.Configure<TOptions>(configuration)` - Single configuration  
+- `services.Configure<TOptions>(name, configuration)` - Named configuration
 
 ## 🛡️ **Resilience Policies**
 

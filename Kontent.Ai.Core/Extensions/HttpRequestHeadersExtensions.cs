@@ -111,7 +111,7 @@ public static class HttpRequestHeadersExtensions
     private static Assembly? GetSdkAssembly()
     {
         // Fallback method when SDK assembly is not explicitly provided
-        // This should rarely be used since ActionInvoker now passes the assembly directly
+        // This should rarely be used since TrackingHandler now receives the assembly directly
         var callingAssembly = Assembly.GetCallingAssembly();
         var executingAssembly = Assembly.GetExecutingAssembly(); // This is Kontent.Ai.Core
         
