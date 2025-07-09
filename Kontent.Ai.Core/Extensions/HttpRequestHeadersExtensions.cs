@@ -14,7 +14,7 @@ public static class HttpRequestHeadersExtensions
     private const string PackageRepositoryHost = "nuget.org";
 
     // Cache these values since they don't change during application lifetime
-    private static readonly ConcurrentDictionary<Assembly, string> SdkTrackingHeaderCache = new();
+    private static readonly ConcurrentDictionary<Assembly, string> SdkTrackingHeaderCache = [];
     private static readonly Lazy<string?> SourceTrackingHeaderValue = new(GetSourceTrackingHeaderValue);
 
     /// <summary>
