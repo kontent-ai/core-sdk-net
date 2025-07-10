@@ -1,5 +1,6 @@
 using Kontent.Ai.Core.Abstractions;
 using Kontent.Ai.Core.Configuration;
+using Kontent.Ai.Core.Extensions;
 using Microsoft.Extensions.Options;
 
 namespace Kontent.Ai.Core.Factories;
@@ -78,12 +79,13 @@ public sealed class ClientFactoryBuilder<TClient, TOptions>
                 opt.MaxRetryAttempts = config.Options.MaxRetryAttempts;
             });
 
-            // Register named HttpClient if custom configuration is provided
-            if (config.ConfigureHttpClient != null)
-            {
-                var httpClientBuilder = _services.AddHttpClient(config.Options.HttpClientName);
-                config.ConfigureHttpClient(httpClientBuilder);
-            }
+            // Register named HttpClient with default resilience policies and handlers
+            var httpClientBuilder = _services.AddHttpClient(config.Options.HttpClientName)
+                .AddResilienceFromClientOptions(config.Options)
+                .AddRequestHandlers();
+            
+            // Apply any custom configuration provided by the user
+            config.ConfigureHttpClient?.Invoke(httpClientBuilder);
         }
 
         // Register the concrete factory implementation

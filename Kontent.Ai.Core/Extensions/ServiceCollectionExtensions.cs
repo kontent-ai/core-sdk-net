@@ -105,8 +105,11 @@ public static class ServiceCollectionExtensions
         // Register options as singleton
         services.AddSingleton(options);
 
-        // Register named HttpClient (still needs a name internally)
-        var httpClientBuilder = services.AddHttpClient(options.HttpClientName);
+        // Register named HttpClient with resilience policies
+        var httpClientBuilder = services.AddHttpClient(options.HttpClientName)
+            .AddResilienceFromClientOptions(options)
+            .AddRequestHandlers();
+        
         configureHttpClient?.Invoke(httpClientBuilder);
 
         // Register the client as singleton

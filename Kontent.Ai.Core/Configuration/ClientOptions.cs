@@ -2,7 +2,7 @@ namespace Kontent.Ai.Core.Configuration;
 
 /// <summary>
 /// Base configuration options for Kontent.ai clients.
-/// SDK authors should inherit from this class to create their specific options.
+/// SDKs should inherit from this class to create their specific options.
 /// </summary>
 public abstract class ClientOptions
 {
@@ -15,7 +15,6 @@ public abstract class ClientOptions
     /// <summary>
     /// Gets or sets the API key for authentication.
     /// This is automatically applied to HTTP requests by the AuthenticationHandler with Bearer scheme.
-    /// Different SDKs may have different requirements for this field.
     /// </summary>
     public string? ApiKey { get; set; }
 
@@ -33,8 +32,25 @@ public abstract class ClientOptions
 
     /// <summary>
     /// Gets or sets the maximum number of retry attempts for failed requests.
-    /// Note: This is a configuration value only - retry implementation is the responsibility 
-    /// of individual SDKs using policies like Microsoft.Extensions.Http.Resilience or custom handlers.
+    /// This is used by the default resilience policy to configure retry behavior.
     /// </summary>
-    public int MaxRetryAttempts { get; set; } = 5;
+    public int MaxRetryAttempts { get; set; } = 3;
+
+    /// <summary>
+    /// Gets or sets whether to enable the default resilience policy.
+    /// When true, the HttpClient will be configured with retry, circuit breaker, and timeout policies.
+    /// </summary>
+    public bool EnableDefaultResilience { get; set; } = true;
+
+    /// <summary>
+    /// Gets or sets the base delay for retry attempts.
+    /// Used in exponential backoff calculations for the default retry policy.
+    /// </summary>
+    public TimeSpan RetryBaseDelay { get; set; } = TimeSpan.FromSeconds(1);
+
+    /// <summary>
+    /// Gets or sets the request timeout for individual HTTP requests.
+    /// This is separate from the overall HttpClient timeout.
+    /// </summary>
+    public TimeSpan RequestTimeout { get; set; } = TimeSpan.FromSeconds(30);
 } 
