@@ -29,16 +29,12 @@ public abstract class ClientOptions
     /// Gets or sets the HTTP client name for named HttpClient instances.
     /// Used by IHttpClientFactory to resolve the correct client configuration.
     /// </summary>
-    public string HttpClientName { get; set; } = "kontentai-http-client";
+    public required string HttpClientName { get; set; }
 
     /// <summary>
     /// Gets or sets the maximum number of retry attempts for failed requests.
-    /// This value can be used by consumers to configure retry policies as needed.
+    /// Note: This is a configuration value only - retry implementation is the responsibility 
+    /// of individual SDKs using policies like Microsoft.Extensions.Http.Resilience or custom handlers.
     /// </summary>
     public int MaxRetryAttempts { get; set; } = 5;
-
-    /// <summary>
-    /// Gets or sets the request timeout for individual HTTP operations.
-    /// </summary>
-    public TimeSpan RequestTimeout { get; set; } = TimeSpan.FromSeconds(30);
 } 

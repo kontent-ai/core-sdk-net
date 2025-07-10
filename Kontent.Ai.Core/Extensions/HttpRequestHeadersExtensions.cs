@@ -1,6 +1,6 @@
-using System.Collections.Concurrent;
 using System.Diagnostics;
 using Kontent.Ai.Core.Attributes;
+using Kontent.Ai.Core.Configuration;
 
 namespace Kontent.Ai.Core.Extensions;
 
@@ -14,28 +14,21 @@ public static class HttpRequestHeadersExtensions
     private const string PackageRepositoryHost = "nuget.org";
 
     // Cache these values since they don't change during application lifetime
-    private static readonly ConcurrentDictionary<Assembly, string> SdkTrackingHeaderCache = [];
     private static readonly Lazy<string?> SourceTrackingHeaderValue = new(GetSourceTrackingHeaderValue);
 
     /// <summary>
-    /// Adds the SDK tracking header to the request.
+    /// Adds the SDK tracking header to the request using the provided SDK identity.
+    /// This is the preferred method for AOT-compatible tracking.
     /// </summary>
     /// <param name="headers">The HTTP request headers.</param>
-    /// <param name="sdkAssembly">Optional SDK assembly to use for tracking. If not provided, attempts to detect automatically.</param>
-    public static void AddSdkTrackingHeader(this HttpRequestHeaders headers, Assembly? sdkAssembly = null)
+    /// <param name="sdkIdentity">The SDK identity to use for tracking.</param>
+    public static void AddSdkTrackingHeader(this HttpRequestHeaders headers, SdkIdentity sdkIdentity)
     {
-        sdkAssembly ??= GetSdkAssembly();
-        if (sdkAssembly != null)
-        {
-            var trackingValue = SdkTrackingHeaderCache.GetOrAdd(sdkAssembly, assembly =>
-            {
-                var sdkVersion = assembly.GetProductVersion();
-                var sdkPackageId = assembly.GetName().Name;
-                return $"{PackageRepositoryHost};{sdkPackageId};{sdkVersion}";
-            });
-            
-            headers.Add(SdkTrackingHeaderName, trackingValue);
-        }
+        ArgumentNullException.ThrowIfNull(headers);
+        ArgumentNullException.ThrowIfNull(sdkIdentity);
+        
+        var trackingValue = sdkIdentity.ToTrackingString(PackageRepositoryHost);
+        headers.Add(SdkTrackingHeaderName, trackingValue);
     }
 
     /// <summary>
@@ -106,24 +99,6 @@ public static class HttpRequestHeadersExtensions
         }
 
         return $"{packageName};{version}";
-    }
-
-    private static Assembly? GetSdkAssembly()
-    {
-        // Fallback method when SDK assembly is not explicitly provided
-        // This should rarely be used since TrackingHandler now receives the assembly directly
-        var callingAssembly = Assembly.GetCallingAssembly();
-        var executingAssembly = Assembly.GetExecutingAssembly(); // This is Kontent.Ai.Core
-        
-        // If the calling assembly is not the core package and references it, it's likely the SDK
-        if (callingAssembly != executingAssembly &&
-            callingAssembly.GetReferencedAssemblies()
-                .Any(refAssembly => refAssembly.FullName == executingAssembly.FullName))
-        {
-            return callingAssembly;
-        }
-        
-        return null;
     }
 
     private static string? GetSourceTrackingHeaderValue()

@@ -35,7 +35,7 @@ namespace Kontent.Ai.Core.Abstractions;
 /// }
 /// 
 /// // Register with DI:
-/// services.AddKontentCore(new ApplicationInsightsApiUsageListener(telemetryClient));
+/// services.AddCoreServices(new ApplicationInsightsApiUsageListener(telemetryClient));
 /// </code>
 /// </example>
 public interface IApiUsageListener

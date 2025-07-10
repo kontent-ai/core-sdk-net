@@ -1,4 +1,5 @@
 using Kontent.Ai.Core.Abstractions;
+using Kontent.Ai.Core.Configuration;
 using System.Diagnostics;
 using Microsoft.Extensions.Logging;
 
@@ -12,12 +13,21 @@ namespace Kontent.Ai.Core.Handlers;
 /// Initializes a new instance of the TelemetryHandler.
 /// </remarks>
 /// <param name="apiUsageListener">The API usage listener to notify of request events.</param>
-public sealed class TelemetryHandler(
-    IApiUsageListener listener,
-    ILogger<TelemetryHandler> logger) : DelegatingHandler
+public sealed class TelemetryHandler : DelegatingHandler
 {
-    private readonly IApiUsageListener _listener = listener ?? throw new ArgumentNullException(nameof(listener));
-    private readonly ILogger<TelemetryHandler> _logger = logger;
+    private readonly IApiUsageListener _listener;
+    private readonly ILogger<TelemetryHandler> _logger;
+    private readonly TelemetryExceptionBehavior _exceptionBehavior;
+
+    public TelemetryHandler(IApiUsageListener listener, ILogger<TelemetryHandler> logger, TelemetryExceptionBehavior exceptionBehavior)
+    {
+        ArgumentNullException.ThrowIfNull(listener);
+        ArgumentNullException.ThrowIfNull(logger);
+        
+        _listener = listener;
+        _logger = logger;
+        _exceptionBehavior = exceptionBehavior;
+    }
 
     protected override async Task<HttpResponseMessage> SendAsync(
         HttpRequestMessage request,
@@ -31,11 +41,11 @@ public sealed class TelemetryHandler(
         {
             try
             {
-                await _listener.OnRequestStartAsync(request, cancellationToken);
+                await _listener.OnRequestStartAsync(request, cancellationToken).ConfigureAwait(false);
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "ApiUsageListener.OnRequestStartAsync failed");
+                HandleTelemetryException(ex, "OnRequestStartAsync");
             }
 
             response = await base.SendAsync(request, cancellationToken);
@@ -52,12 +62,27 @@ public sealed class TelemetryHandler(
             try
             {
                 await _listener.OnRequestEndAsync(
-                    request, response, exception, stopwatch.Elapsed, cancellationToken);
+                    request, response, exception, stopwatch.Elapsed, cancellationToken).ConfigureAwait(false);
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "ApiUsageListener.OnRequestEndAsync failed");
+                HandleTelemetryException(ex, "OnRequestEndAsync");
             }
+        }
+    }
+
+    private void HandleTelemetryException(Exception exception, string methodName)
+    {
+        switch (_exceptionBehavior)
+        {
+            case TelemetryExceptionBehavior.LogAndContinue:
+                _logger.LogWarning(exception, "ApiUsageListener.{MethodName} failed", methodName);
+                break;
+            case TelemetryExceptionBehavior.ThrowException:
+                throw new InvalidOperationException($"Telemetry listener failed in {methodName}. This may indicate a configuration issue.", exception);
+            default:
+                _logger.LogWarning(exception, "ApiUsageListener.{MethodName} failed", methodName);
+                break;
         }
     }
 }

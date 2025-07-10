@@ -1,8 +1,9 @@
 using Kontent.Ai.Core.Abstractions;
+using Kontent.Ai.Core.Configuration;
 using Kontent.Ai.Core.Factories;
 using Kontent.Ai.Core.Handlers;
 using Kontent.Ai.Core.Modules.ApiUsageListener;
-using System.Text.Json;
+using Microsoft.Extensions.Logging;
 
 namespace Kontent.Ai.Core.Extensions;
 
@@ -16,48 +17,19 @@ public static class ServiceCollectionExtensions
     /// This method should be called before registering specific SDK services.
     /// </summary>
     /// <param name="services">The service collection to register services with.</param>
+    /// <param name="options">Optional configuration options for core services.</param>
     /// <returns>The service collection for chaining.</returns>
-    public static IServiceCollection AddKontentCore(this IServiceCollection services)
-        => services.AddKontentCore(configureJsonOptions: null, apiUsageListener: null);
-
-    /// <summary>
-    /// Registers core Kontent.ai services with custom JSON serialization options.
-    /// This method should be called before registering specific SDK services.
-    /// </summary>
-    /// <param name="services">The service collection to register services with.</param>
-    /// <param name="configureJsonOptions">Action to configure custom JSON serialization options.</param>
-    /// <returns>The service collection for chaining.</returns>
-    public static IServiceCollection AddKontentCore(this IServiceCollection services, Action<JsonSerializerOptions> configureJsonOptions)
-        => services.AddKontentCore(configureJsonOptions, apiUsageListener: null);
-
-    /// <summary>
-    /// Registers core Kontent.ai services with a custom API usage listener for telemetry.
-    /// This method should be called before registering specific SDK services.
-    /// </summary>
-    /// <param name="services">The service collection to register services with.</param>
-    /// <param name="apiUsageListener">The custom API usage listener for telemetry.</param>
-    /// <returns>The service collection for chaining.</returns>
-    public static IServiceCollection AddKontentCore(this IServiceCollection services, IApiUsageListener apiUsageListener)
-        => services.AddKontentCore(configureJsonOptions: null, apiUsageListener);
-
-    /// <summary>
-    /// Registers core Kontent.ai services with custom JSON serialization options and a custom API usage listener for telemetry.
-    /// This method should be called before registering specific SDK services.
-    /// </summary>
-    /// <param name="services">The service collection to register services with.</param>
-    /// <param name="configureJsonOptions">Action to configure custom JSON serialization options.</param>
-    /// <param name="apiUsageListener">The custom API usage listener for telemetry.</param>
-    /// <returns>The service collection for chaining.</returns>
-    public static IServiceCollection AddKontentCore(
-        this IServiceCollection services, 
-        Action<JsonSerializerOptions>? configureJsonOptions, 
-        IApiUsageListener? apiUsageListener)
+    public static IServiceCollection AddCoreServices(this IServiceCollection services, CoreServicesOptions? options = null)
     {
+        ArgumentNullException.ThrowIfNull(services);
+        
+        options ??= new CoreServicesOptions();
+        
         // Register JSON serialization options (default or configured)
-        if (configureJsonOptions != null)
+        if (options.ConfigureJsonOptions != null)
         {
             var jsonOptions = RefitSettingsFactory.DefaultJsonOptions();
-            configureJsonOptions(jsonOptions);
+            options.ConfigureJsonOptions(jsonOptions);
             services.AddSingleton(jsonOptions);
         }
         else
@@ -66,44 +38,104 @@ public static class ServiceCollectionExtensions
         }
         
         // Register telemetry listener (default or custom)
-        services.AddSingleton<IApiUsageListener>(apiUsageListener ?? DefaultApiUsageListener.Instance);
+        services.AddSingleton<IApiUsageListener>(options.ApiUsageListener ?? DefaultApiUsageListener.Instance);
+        
+        // Register SDK identity for tracking (default or custom)
+        services.AddSingleton(options.SdkIdentity ?? SdkIdentity.Core);
         
         // Register handlers as transient - they'll be used per HTTP request
         services.AddTransient<TrackingHandler>();
         services.AddTransient<AuthenticationHandler>();
-        services.AddTransient<TelemetryHandler>();
+        services.AddTransient<TelemetryHandler>(serviceProvider =>
+        {
+            var listener = serviceProvider.GetRequiredService<IApiUsageListener>();
+            var logger = serviceProvider.GetRequiredService<ILogger<TelemetryHandler>>();
+            return new TelemetryHandler(listener, logger, options.TelemetryExceptionBehavior);
+        });
         
         return services;
     }
 
     /// <summary>
     /// Registers a multiple client factory that allows creating multiple named instances of a Kontent.ai client.
-    /// This method provides the base infrastructure that SDKs can extend for their specific client types.
+    /// This simplified method uses factory delegates instead of complex inheritance patterns.
     /// </summary>
     /// <typeparam name="TClient">The client type to create.</typeparam>
     /// <typeparam name="TOptions">The options type for the client.</typeparam>
-    /// <typeparam name="TFactory">The factory implementation type.</typeparam>
-    /// <typeparam name="TBuilder">The builder type for configuring multiple clients.</typeparam>
     /// <param name="services">The service collection to register services with.</param>
+    /// <param name="clientFactory">Factory delegate to create client instances from options.</param>
     /// <param name="configureFactory">Action to configure the multiple client factory using the builder.</param>
     /// <returns>The service collection for chaining.</returns>
-    public static IServiceCollection AddMultipleClientFactory<TClient, TOptions, TFactory, TBuilder>(
+    public static IServiceCollection AddMultipleClientFactory<TClient, TOptions>(
         this IServiceCollection services,
-        Action<TBuilder> configureFactory)
-        where TOptions : Configuration.ClientOptions
-        where TFactory : class, IMultipleClientFactory<TClient, TOptions>
-        where TBuilder : MultipleClientFactoryBuilder<TClient, TOptions, TBuilder>
+        Func<TOptions, TClient> clientFactory,
+        Action<ClientFactoryBuilder<TClient, TOptions>> configureFactory)
+        where TOptions : ClientOptions, new()
     {
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentNullException.ThrowIfNull(clientFactory);
         ArgumentNullException.ThrowIfNull(configureFactory);
 
-        // Create the builder and configure it
-        var builder = (TBuilder)Activator.CreateInstance(typeof(TBuilder), services)!;
+        // Create the simplified builder and configure it
+        var builder = new ClientFactoryBuilder<TClient, TOptions>(services, clientFactory);
         configureFactory(builder);
 
         // Build the configurations and register the factory
         builder.Build();
-        services.AddSingleton<IMultipleClientFactory<TClient, TOptions>, TFactory>();
 
         return services;
+    }
+
+    /// <summary>
+    /// Registers a single client instance with default configuration (no naming required).
+    /// This is the preferred method for most users who only need one client instance.
+    /// </summary>
+    public static IServiceCollection AddClient<TClient, TOptions>(
+        this IServiceCollection services,
+        TOptions options,
+        Func<TOptions, TClient> clientFactory,
+        Action<IHttpClientBuilder>? configureHttpClient = null)
+        where TClient : class
+        where TOptions : ClientOptions
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentNullException.ThrowIfNull(options);
+        ArgumentNullException.ThrowIfNull(clientFactory);
+
+        // Register options as singleton
+        services.AddSingleton(options);
+
+        // Register named HttpClient (still needs a name internally)
+        var httpClientBuilder = services.AddHttpClient(options.HttpClientName);
+        configureHttpClient?.Invoke(httpClientBuilder);
+
+        // Register the client as singleton
+        services.AddSingleton<TClient>(serviceProvider =>
+        {
+            var httpClientFactory = serviceProvider.GetRequiredService<IHttpClientFactory>();
+            var httpClient = httpClientFactory.CreateClient(options.HttpClientName);
+            
+            // You'd need to adapt this based on your client constructor pattern
+            return clientFactory(options);
+        });
+
+        return services;
+    }
+
+    /// <summary>
+    /// Registers a single client with configuration delegate.
+    /// </summary>
+    public static IServiceCollection AddClient<TClient, TOptions>(
+        this IServiceCollection services,
+        Action<TOptions> configureOptions,
+        Func<TOptions, TClient> clientFactory,
+        Action<IHttpClientBuilder>? configureHttpClient = null)
+        where TClient : class
+        where TOptions : ClientOptions, new()
+    {
+        var options = new TOptions();
+        configureOptions(options);
+        
+        return services.AddClient(options, clientFactory, configureHttpClient);
     }
 } 

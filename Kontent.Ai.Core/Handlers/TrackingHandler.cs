@@ -1,3 +1,4 @@
+using Kontent.Ai.Core.Configuration;
 using Kontent.Ai.Core.Extensions;
 
 namespace Kontent.Ai.Core.Handlers;
@@ -6,13 +7,19 @@ namespace Kontent.Ai.Core.Handlers;
 /// DelegatingHandler that injects SDK and source tracking headers on every request.
 /// This handler automatically adds X-KC-SDKID and X-KC-SOURCE headers according to Kontent.ai guidelines.
 /// </summary>
-/// <remarks>
-/// Initializes a new instance of the TrackingHandler.
-/// </remarks>
-/// <param name="sdkAssembly">Optional SDK assembly to use for tracking. If not provided, attempts to detect automatically.</param>
-public sealed class TrackingHandler(Assembly? sdkAssembly = null) : DelegatingHandler
+public sealed class TrackingHandler : DelegatingHandler
 {
-    private readonly Assembly? _sdkAssembly = sdkAssembly;
+    private readonly SdkIdentity _sdkIdentity;
+
+    /// <summary>
+    /// Initializes a new instance of the TrackingHandler.
+    /// </summary>
+    /// <param name="sdkIdentity">SDK identity to use for tracking headers.</param>
+    public TrackingHandler(SdkIdentity sdkIdentity)
+    {
+        ArgumentNullException.ThrowIfNull(sdkIdentity);
+        _sdkIdentity = sdkIdentity;
+    }
 
     /// <summary>
     /// Sends an HTTP request with tracking headers added.
@@ -25,10 +32,10 @@ public sealed class TrackingHandler(Assembly? sdkAssembly = null) : DelegatingHa
         CancellationToken cancellationToken)
     {
         // Add tracking headers to the request
-        request.Headers.AddSdkTrackingHeader(_sdkAssembly);
+        request.Headers.AddSdkTrackingHeader(_sdkIdentity);
         request.Headers.AddSourceTrackingHeader();
 
         // Continue with the request pipeline
-        return await base.SendAsync(request, cancellationToken);
+        return await base.SendAsync(request, cancellationToken).ConfigureAwait(false);
     }
 } 

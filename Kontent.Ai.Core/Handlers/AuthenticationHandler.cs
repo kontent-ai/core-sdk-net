@@ -21,7 +21,8 @@ public class AuthenticationHandler<TOptions> : DelegatingHandler
     /// <param name="clientOptionsMonitor">The client options monitor for retrieving authentication configuration.</param>
     public AuthenticationHandler(IOptionsMonitor<TOptions> clientOptionsMonitor)
     {
-        _clientOptionsMonitor = clientOptionsMonitor ?? throw new ArgumentNullException(nameof(clientOptionsMonitor));
+        ArgumentNullException.ThrowIfNull(clientOptionsMonitor);
+        _clientOptionsMonitor = clientOptionsMonitor;
     }
 
     /// <summary>
@@ -31,8 +32,11 @@ public class AuthenticationHandler<TOptions> : DelegatingHandler
     /// <param name="optionsName">The name of the options configuration to use.</param>
     public AuthenticationHandler(IOptionsMonitor<TOptions> clientOptionsMonitor, string optionsName)
     {
-        _clientOptionsMonitor = clientOptionsMonitor ?? throw new ArgumentNullException(nameof(clientOptionsMonitor));
-        _optionsName = optionsName ?? throw new ArgumentNullException(nameof(optionsName));
+        ArgumentNullException.ThrowIfNull(clientOptionsMonitor);
+        ArgumentNullException.ThrowIfNull(optionsName);
+        
+        _clientOptionsMonitor = clientOptionsMonitor;
+        _optionsName = optionsName;
     }
 
     /// <summary>
@@ -57,7 +61,7 @@ public class AuthenticationHandler<TOptions> : DelegatingHandler
         }
 
         // Continue with the request pipeline
-        return await base.SendAsync(request, cancellationToken);
+        return await base.SendAsync(request, cancellationToken).ConfigureAwait(false);
     }
 }
 
