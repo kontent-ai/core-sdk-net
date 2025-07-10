@@ -27,10 +27,10 @@ public enum TelemetryExceptionBehavior
     /// Recommended for production scenarios where telemetry failures shouldn't impact the main request.
     /// </summary>
     LogAndContinue,
-    
+
     /// <summary>
     /// Throw the exception and fail the request.
     /// Recommended for development scenarios where you want to catch configuration issues early.
     /// </summary>
     ThrowException
-} 
+}

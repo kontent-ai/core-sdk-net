@@ -34,7 +34,7 @@ public class AuthenticationHandler<TOptions> : DelegatingHandler
     {
         ArgumentNullException.ThrowIfNull(clientOptionsMonitor);
         ArgumentNullException.ThrowIfNull(optionsName);
-        
+
         _clientOptionsMonitor = clientOptionsMonitor;
         _optionsName = optionsName;
     }
@@ -46,12 +46,12 @@ public class AuthenticationHandler<TOptions> : DelegatingHandler
     /// <param name="cancellationToken">The cancellation token.</param>
     /// <returns>The HTTP response message.</returns>
     protected override async Task<HttpResponseMessage> SendAsync(
-        HttpRequestMessage request, 
+        HttpRequestMessage request,
         CancellationToken cancellationToken)
     {
         // Get the client options (named or default)
-        var clientOptions = string.IsNullOrEmpty(_optionsName) 
-            ? _clientOptionsMonitor.CurrentValue 
+        var clientOptions = string.IsNullOrEmpty(_optionsName)
+            ? _clientOptionsMonitor.CurrentValue
             : _clientOptionsMonitor.Get(_optionsName);
 
         // Add authorization header if API key is configured
@@ -75,7 +75,7 @@ public class AuthenticationHandler : AuthenticationHandler<ClientOptions>
     /// Initializes a new instance of the AuthenticationHandler with default options.
     /// </summary>
     /// <param name="clientOptionsMonitor">The client options monitor for retrieving authentication configuration.</param>
-    public AuthenticationHandler(IOptionsMonitor<ClientOptions> clientOptionsMonitor) 
+    public AuthenticationHandler(IOptionsMonitor<ClientOptions> clientOptionsMonitor)
         : base(clientOptionsMonitor)
     {
     }
@@ -85,8 +85,8 @@ public class AuthenticationHandler : AuthenticationHandler<ClientOptions>
     /// </summary>
     /// <param name="clientOptionsMonitor">The client options monitor for retrieving authentication configuration.</param>
     /// <param name="optionsName">The name of the options configuration to use.</param>
-    public AuthenticationHandler(IOptionsMonitor<ClientOptions> clientOptionsMonitor, string optionsName) 
+    public AuthenticationHandler(IOptionsMonitor<ClientOptions> clientOptionsMonitor, string optionsName)
         : base(clientOptionsMonitor, optionsName)
     {
     }
-} 
+}

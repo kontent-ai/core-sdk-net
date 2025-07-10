@@ -18,7 +18,7 @@ public static class RefitSettingsFactory
     public static RefitSettings Create(JsonSerializerOptions? jsonOptions = null)
     {
         var options = jsonOptions ?? DefaultJsonOptions();
-        
+
         return new RefitSettings
         {
             ContentSerializer = new SystemTextJsonContentSerializer(options)
@@ -50,10 +50,10 @@ public static class RefitSettingsFactory
     public static RefitSettings Create(SystemTextJsonContentSerializer contentSerializer)
     {
         ArgumentNullException.ThrowIfNull(contentSerializer);
-        
+
         return new RefitSettings
         {
             ContentSerializer = contentSerializer
         };
     }
-} 
+}

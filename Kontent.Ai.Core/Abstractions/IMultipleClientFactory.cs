@@ -5,9 +5,9 @@ namespace Kontent.Ai.Core.Abstractions;
 /// This interface supports the factory pattern where consumers can create multiple clients with different configurations.
 /// </summary>
 /// <typeparam name="TClient">The client type to create.</typeparam>
-/// <typeparam name="TOptions">The options type for the client.</typeparam>
-public interface IMultipleClientFactory<TClient, TOptions> 
-    where TOptions : Configuration.ClientOptions
+/// <typeparam name="TOptions">The options type for the client, must inherit from NamedClientOptions.</typeparam>
+public interface IMultipleClientFactory<TClient, TOptions>
+    where TOptions : Configuration.NamedClientOptions
 {
     /// <summary>
     /// Creates a named client using the configuration registered for the specified name.
@@ -30,4 +30,4 @@ public interface IMultipleClientFactory<TClient, TOptions>
     /// <param name="name">The client name to check.</param>
     /// <returns>True if a client with the specified name is registered; otherwise, false.</returns>
     bool IsClientRegistered(string name);
-} 
+}

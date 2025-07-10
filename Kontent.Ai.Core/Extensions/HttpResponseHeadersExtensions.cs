@@ -46,6 +46,6 @@ public static class HttpResponseHeadersExtensions
         return false;
     }
 
-    private static TimeSpan GetPositiveOrZero(TimeSpan timeSpan) => 
+    private static TimeSpan GetPositiveOrZero(TimeSpan timeSpan) =>
         timeSpan < TimeSpan.Zero ? TimeSpan.Zero : timeSpan;
-} 
+}

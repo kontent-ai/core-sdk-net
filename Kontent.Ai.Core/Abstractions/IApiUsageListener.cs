@@ -58,9 +58,9 @@ public interface IApiUsageListener
     /// <param name="cancellationToken">The cancellation token for the request.</param>
     /// <returns>A task representing the asynchronous operation.</returns>
     Task OnRequestEndAsync(
-        HttpRequestMessage request, 
-        HttpResponseMessage? response, 
-        Exception? exception, 
-        TimeSpan elapsed, 
+        HttpRequestMessage request,
+        HttpResponseMessage? response,
+        Exception? exception,
+        TimeSpan elapsed,
         CancellationToken cancellationToken = default);
-} 
+}

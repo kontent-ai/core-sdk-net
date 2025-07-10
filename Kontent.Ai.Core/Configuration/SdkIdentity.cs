@@ -20,17 +20,24 @@ public record SdkIdentity(string Name, Version Version)
     public string ToTrackingString(string packageRepositoryHost = "nuget.org") =>
         $"{packageRepositoryHost};{Name};{Version}";
 
-    private static Version GetCoreVersion()
+    private static readonly Lazy<Version> _coreVersion = new(() =>
     {
         var assembly = typeof(SdkIdentity).Assembly;
-        var versionAttribute = assembly.GetCustomAttributes<AssemblyInformationalVersionAttribute>().FirstOrDefault();
-        
-        if (versionAttribute?.InformationalVersion != null &&
-            Version.TryParse(versionAttribute.InformationalVersion.Split('-')[0], out var version))
+        var versionAttribute = assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>();
+
+        if (versionAttribute?.InformationalVersion != null)
         {
-            return version;
+            // Handle semantic versions with pre-release suffixes (e.g., "1.0.0-beta.1")
+            var versionPart = versionAttribute.InformationalVersion.Split('-')[0];
+            if (Version.TryParse(versionPart, out var version))
+            {
+                return version;
+            }
         }
-        
-        return new Version(1, 0, 0);
-    }
-} 
+
+        // Fallback to assembly version if informational version is not available
+        return assembly.GetName().Version ?? new Version(1, 0, 0);
+    });
+
+    private static Version GetCoreVersion() => _coreVersion.Value;
+}

@@ -62,4 +62,4 @@ public class SourceTrackingHeaderAttribute : Attribute
     /// Gets whether to load version information from the assembly.
     /// </summary>
     public bool LoadFromAssembly { get; }
-} 
+}

@@ -3,6 +3,7 @@ namespace Kontent.Ai.Core.Configuration;
 /// <summary>
 /// Base configuration options for Kontent.ai clients.
 /// SDKs should inherit from this class to create their specific options.
+/// Contains only core API configuration - no HttpClient naming concerns.
 /// </summary>
 public abstract class ClientOptions
 {
@@ -25,32 +26,22 @@ public abstract class ClientOptions
     public required string BaseUrl { get; set; }
 
     /// <summary>
+    /// Gets or sets whether to enable the default resilience policy.
+    /// When true, the HttpClient will be configured with sensible default retry, circuit breaker, and timeout policies.
+    /// When false, no default resilience is applied, allowing full customization via configureResilience delegates.
+    /// </summary>
+    public bool EnableDefaultResilience { get; set; } = true;
+}
+
+/// <summary>
+/// Configuration options for named Kontent.ai clients used in factory patterns.
+/// Extends ClientOptions with HttpClient naming for multiple client scenarios.
+/// </summary>
+public abstract class NamedClientOptions : ClientOptions
+{
+    /// <summary>
     /// Gets or sets the HTTP client name for named HttpClient instances.
     /// Used by IHttpClientFactory to resolve the correct client configuration.
     /// </summary>
     public required string HttpClientName { get; set; }
-
-    /// <summary>
-    /// Gets or sets the maximum number of retry attempts for failed requests.
-    /// This is used by the default resilience policy to configure retry behavior.
-    /// </summary>
-    public int MaxRetryAttempts { get; set; } = 3;
-
-    /// <summary>
-    /// Gets or sets whether to enable the default resilience policy.
-    /// When true, the HttpClient will be configured with retry, circuit breaker, and timeout policies.
-    /// </summary>
-    public bool EnableDefaultResilience { get; set; } = true;
-
-    /// <summary>
-    /// Gets or sets the base delay for retry attempts.
-    /// Used in exponential backoff calculations for the default retry policy.
-    /// </summary>
-    public TimeSpan RetryBaseDelay { get; set; } = TimeSpan.FromSeconds(1);
-
-    /// <summary>
-    /// Gets or sets the request timeout for individual HTTP requests.
-    /// This is separate from the overall HttpClient timeout.
-    /// </summary>
-    public TimeSpan RequestTimeout { get; set; } = TimeSpan.FromSeconds(30);
-} 
+}

@@ -18,7 +18,6 @@ public static class HttpRequestHeadersExtensions
 
     /// <summary>
     /// Adds the SDK tracking header to the request using the provided SDK identity.
-    /// This is the preferred method for AOT-compatible tracking.
     /// </summary>
     /// <param name="headers">The HTTP request headers.</param>
     /// <param name="sdkIdentity">The SDK identity to use for tracking.</param>
@@ -26,7 +25,7 @@ public static class HttpRequestHeadersExtensions
     {
         ArgumentNullException.ThrowIfNull(headers);
         ArgumentNullException.ThrowIfNull(sdkIdentity);
-        
+
         var trackingValue = sdkIdentity.ToTrackingString(PackageRepositoryHost);
         headers.Add(SdkTrackingHeaderName, trackingValue);
     }
@@ -129,4 +128,4 @@ public static class HttpRequestHeadersExtensions
         var version = entryAssembly.GetProductVersion();
         return $"{assemblyName};{version}";
     }
-} 
+}
