@@ -24,13 +24,13 @@ public record SdkIdentity(string Name, Version Version)
     {
         var assembly = typeof(SdkIdentity).Assembly;
         var versionAttribute = assembly.GetCustomAttributes<AssemblyInformationalVersionAttribute>().FirstOrDefault();
-        
+
         if (versionAttribute?.InformationalVersion != null &&
             Version.TryParse(versionAttribute.InformationalVersion.Split('-')[0], out var version))
         {
             return version;
         }
-        
+
         return new Version(1, 0, 0);
     }
-} 
+}

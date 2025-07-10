@@ -22,7 +22,7 @@ public sealed class DefaultApiUsageListener : IApiUsageListener
     /// <param name="cancellationToken">The cancellation token for the request.</param>
     /// <returns>A completed task.</returns>
     public Task OnRequestStartAsync(HttpRequestMessage request, CancellationToken cancellationToken = default)
-        => Task.CompletedTask;  
+        => Task.CompletedTask;
 
     /// <summary>
     /// No-op implementation of OnRequestEndAsync.
@@ -34,10 +34,10 @@ public sealed class DefaultApiUsageListener : IApiUsageListener
     /// <param name="cancellationToken">The cancellation token for the request.</param>
     /// <returns>A completed task.</returns>
     public Task OnRequestEndAsync(
-        HttpRequestMessage request, 
-        HttpResponseMessage? response, 
-        Exception? exception, 
+        HttpRequestMessage request,
+        HttpResponseMessage? response,
+        Exception? exception,
         TimeSpan elapsed,
         CancellationToken cancellationToken = default)
         => Task.CompletedTask;
-} 
+}

@@ -23,7 +23,7 @@ public sealed class TelemetryHandler : DelegatingHandler
     {
         ArgumentNullException.ThrowIfNull(listener);
         ArgumentNullException.ThrowIfNull(logger);
-        
+
         _listener = listener;
         _logger = logger;
         _exceptionBehavior = exceptionBehavior;
