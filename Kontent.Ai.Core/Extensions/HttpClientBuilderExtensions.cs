@@ -1,6 +1,5 @@
 using Kontent.Ai.Core.Configuration;
 using Kontent.Ai.Core.Handlers;
-using Polly;
 
 namespace Kontent.Ai.Core.Extensions;
 
@@ -9,70 +8,6 @@ namespace Kontent.Ai.Core.Extensions;
 /// </summary>
 public static class HttpClientBuilderExtensions
 {
-    /// <summary>
-    /// Adds default resilience policies optimized for Kontent.ai APIs.
-    /// Includes retry, circuit breaker, and timeout strategies with sensible defaults.
-    /// </summary>
-    /// <param name="builder">The HttpClientBuilder to configure.</param>
-    /// <param name="options">Optional resilience options. If null, uses sensible defaults for Kontent.ai APIs.</param>
-    /// <returns>The HttpClientBuilder for method chaining.</returns>
-    public static IHttpClientBuilder AddDefaultResilienceHandler(
-        this IHttpClientBuilder builder,
-        ResilienceOptions? options = null)
-    {
-        options ??= ResilienceOptions.CreateDefault();
-
-        builder.AddStandardResilienceHandler(configureOptions =>
-        {
-            // Configure retry strategy
-            if (options.EnableRetry && options.Retry.MaxRetryAttempts > 0)
-            {
-                configureOptions.Retry.MaxRetryAttempts = options.Retry.MaxRetryAttempts;
-                configureOptions.Retry.Delay = options.Retry.BaseDelay;
-                configureOptions.Retry.UseJitter = options.Retry.UseJitter;
-                configureOptions.Retry.BackoffType = options.Retry.UseExponentialBackoff
-                    ? DelayBackoffType.Exponential
-                    : DelayBackoffType.Constant;
-            }
-            else
-            {
-                // Disable retry by setting max attempts to 0
-                configureOptions.Retry.MaxRetryAttempts = 0;
-            }
-
-            // Configure circuit breaker strategy only if enabled
-            if (options.EnableCircuitBreaker)
-            {
-                configureOptions.CircuitBreaker.FailureRatio = options.CircuitBreaker.FailureRatio;
-                configureOptions.CircuitBreaker.SamplingDuration = options.CircuitBreaker.SamplingDuration;
-                configureOptions.CircuitBreaker.MinimumThroughput = options.CircuitBreaker.MinimumThroughput;
-                configureOptions.CircuitBreaker.BreakDuration = options.CircuitBreaker.BreakDuration;
-            }
-
-            // Configure timeout strategy only if enabled
-            if (options.EnableTimeout)
-            {
-                configureOptions.TotalRequestTimeout.Timeout = options.Timeout.Timeout;
-            }
-        });
-
-        return builder;
-    }
-
-    /// <summary>
-    /// Adds Kontent.ai handlers in the correct order.
-    /// This ensures proper request/response processing with authentication, tracking, and telemetry.
-    /// </summary>
-    /// <param name="builder">The HttpClientBuilder to configure.</param>
-    /// <returns>The HttpClientBuilder for method chaining.</returns>
-    public static IHttpClientBuilder AddRequestHandlers(this IHttpClientBuilder builder)
-    {
-        return builder
-            .AddHttpMessageHandler<TrackingHandler>()
-            .AddHttpMessageHandler<AuthenticationHandler>()
-            .AddHttpMessageHandler<TelemetryHandler>();
-    }
-
     /// <summary>
     /// Adds Kontent.ai handlers for a specific options type.
     /// This allows type-safe authentication handler registration.
@@ -84,8 +19,8 @@ public static class HttpClientBuilderExtensions
         where TOptions : ClientOptions
     {
         return builder
+            .AddHttpMessageHandler<TelemetryHandler>()
             .AddHttpMessageHandler<TrackingHandler>()
-            .AddHttpMessageHandler<AuthenticationHandler<TOptions>>()
-            .AddHttpMessageHandler<TelemetryHandler>();
+            .AddHttpMessageHandler<AuthenticationHandler<TOptions>>();
     }
 }

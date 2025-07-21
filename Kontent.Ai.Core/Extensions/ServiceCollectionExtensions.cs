@@ -1,188 +1,161 @@
-using Kontent.Ai.Core.Abstractions;
 using Kontent.Ai.Core.Configuration;
-using Kontent.Ai.Core.Factories;
 using Kontent.Ai.Core.Handlers;
 using Kontent.Ai.Core.Modules.ApiUsageListener;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Configuration;
+using Refit;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using Polly;
+using Polly.Retry;
+using Polly.Timeout;
+using Polly.CircuitBreaker;
 
 namespace Kontent.Ai.Core.Extensions;
 
 /// <summary>
 /// Extension methods for IServiceCollection to register Kontent.ai core services.
 /// </summary>
+/// <remarks>
+/// The primary method for registering clients is AddClient&lt;T&gt;() which wraps AddRefitClient&lt;T&gt;
+/// and automatically configures all necessary services including options, resilience, and handlers.
+/// </remarks>
 public static class ServiceCollectionExtensions
 {
     /// <summary>
-    /// Registers core Kontent.ai services including handlers, factories, and default JSON options.
-    /// This method should be called before registering specific SDK services.
+    /// Registers a generic Refit client with all necessary Kontent.ai infrastructure.
+    /// This is the main registration method that wraps AddRefitClient and adds all required services.
     /// </summary>
+    /// <typeparam name="T">The Refit interface type to register.</typeparam>
+    /// <typeparam name="TOptions">The client options type.</typeparam>
     /// <param name="services">The service collection to register services with.</param>
-    /// <param name="options">Optional configuration options for core services.</param>
-    /// <returns>The service collection for chaining.</returns>
-    public static IServiceCollection AddCoreServices(this IServiceCollection services, CoreServicesOptions? options = null)
-    {
-        ArgumentNullException.ThrowIfNull(services);
-
-        options ??= new CoreServicesOptions();
-
-        // Register JSON serialization options (default or configured)
-        if (options.ConfigureJsonOptions != null)
-        {
-            var jsonOptions = RefitSettingsFactory.DefaultJsonOptions();
-            options.ConfigureJsonOptions(jsonOptions);
-            services.AddSingleton(jsonOptions);
-        }
-        else
-        {
-            services.AddSingleton(RefitSettingsFactory.DefaultJsonOptions());
-        }
-
-        // Register telemetry listener (default or custom)
-        services.AddSingleton<IApiUsageListener>(options.ApiUsageListener ?? DefaultApiUsageListener.Instance);
-
-        // Register SDK identity for tracking (default or custom)
-        services.AddSingleton(options.SdkIdentity ?? SdkIdentity.Core);
-
-        // Register handlers as transient - they'll be used per HTTP request
-        services.AddTransient<TrackingHandler>();
-        services.AddTransient<AuthenticationHandler>();
-        services.AddTransient<TelemetryHandler>(serviceProvider =>
-        {
-            var listener = serviceProvider.GetRequiredService<IApiUsageListener>();
-            var logger = serviceProvider.GetRequiredService<ILogger<TelemetryHandler>>();
-            return new TelemetryHandler(listener, logger, options.TelemetryExceptionBehavior);
-        });
-
-        return services;
-    }
-
-    /// <summary>
-    /// Registers a multiple client factory that allows creating multiple named instances of a Kontent.ai client.
-    /// This simplified method uses factory delegates instead of complex inheritance patterns.
-    /// </summary>
-    /// <typeparam name="TClient">The client type to create.</typeparam>
-    /// <typeparam name="TOptions">The options type for the client, must inherit from NamedClientOptions.</typeparam>
-    /// <param name="services">The service collection to register services with.</param>
-    /// <param name="clientFactory">Factory delegate to create client instances from options and HttpClient.</param>
-    /// <param name="configureFactory">Action to configure the multiple client factory using the builder.</param>
-    /// <returns>The service collection for chaining.</returns>
-    public static IServiceCollection AddMultipleClientFactory<TClient, TOptions>(
-        this IServiceCollection services,
-        Func<TOptions, HttpClient, TClient> clientFactory,
-        Action<ClientFactoryBuilder<TClient, TOptions>> configureFactory)
-        where TOptions : NamedClientOptions, new()
-    {
-        ArgumentNullException.ThrowIfNull(services);
-        ArgumentNullException.ThrowIfNull(clientFactory);
-        ArgumentNullException.ThrowIfNull(configureFactory);
-
-        // Create the simplified builder and configure it
-        var builder = new ClientFactoryBuilder<TClient, TOptions>(services, clientFactory);
-        configureFactory(builder);
-
-        // Build the configurations and register the factory
-        builder.Build();
-
-        return services;
-    }
-
-    /// <summary>
-    /// Registers a single client instance for simple scenarios.
-    /// This is the preferred method for most users who only need one client instance.
-    /// HttpClient name is generated automatically.
-    /// </summary>
-    public static IServiceCollection AddClient<TClient, TOptions>(
-        this IServiceCollection services,
-        TOptions options,
-        Func<TOptions, HttpClient, TClient> clientFactory,
-        Action<IHttpClientBuilder>? configureHttpClient = null)
-        where TClient : class
-        where TOptions : ClientOptions
-    {
-        ArgumentNullException.ThrowIfNull(services);
-        ArgumentNullException.ThrowIfNull(options);
-        ArgumentNullException.ThrowIfNull(clientFactory);
-
-        // Generate a default HttpClient name for simple scenarios
-        var httpClientName = $"kontent-ai-{typeof(TClient).Name.ToLowerInvariant()}";
-
-        // Register options as singleton
-        services.AddSingleton(options);
-
-        // Register named HttpClient with resilience policies
-        var httpClientBuilder = services.AddHttpClient(httpClientName);
-
-        // Add default resilience if enabled
-        if (options.EnableDefaultResilience)
-        {
-            httpClientBuilder.AddDefaultResilienceHandler();
-        }
-
-        httpClientBuilder.AddRequestHandlers();
-
-        configureHttpClient?.Invoke(httpClientBuilder);
-
-        // Register the client as singleton
-        services.AddSingleton<TClient>(serviceProvider =>
-        {
-            var httpClientFactory = serviceProvider.GetRequiredService<IHttpClientFactory>();
-            var httpClient = httpClientFactory.CreateClient(httpClientName);
-
-            return clientFactory(options, httpClient);
-        });
-
-        return services;
-    }
-
-    /// <summary>
-    /// Registers a single client with configuration delegate for simple scenarios.
-    /// HttpClient name is generated automatically.
-    /// </summary>
-    public static IServiceCollection AddClient<TClient, TOptions>(
-        this IServiceCollection services,
-        Action<TOptions> configureOptions,
-        Func<TOptions, HttpClient, TClient> clientFactory,
-        Action<IHttpClientBuilder>? configureHttpClient = null)
-        where TClient : class
-        where TOptions : ClientOptions, new()
-    {
-        var options = new TOptions();
-        configureOptions(options);
-
-        return services.AddClient(options, clientFactory, configureHttpClient);
-    }
-
-    /// <summary>
-    /// Registers a single client with IConfiguration binding for simple scenarios.
-    /// Automatically binds configuration section to options and validates them.
-    /// HttpClient name is generated automatically.
-    /// </summary>
-    /// <typeparam name="TClient">The client type to create.</typeparam>
-    /// <typeparam name="TOptions">The options type for the client, must inherit from ClientOptions.</typeparam>
-    /// <param name="services">The service collection to register services with.</param>
-    /// <param name="configuration">The configuration instance to bind options from.</param>
-    /// <param name="sectionName">The configuration section name to bind options from.</param>
-    /// <param name="clientFactory">Factory delegate to create client instances from options and HttpClient.</param>
+    /// <param name="configureClientOptions">Action to configure the client options.</param>
+    /// <param name="configureRefitSettings">Optional action to configure Refit settings.</param>
     /// <param name="configureHttpClient">Optional action to configure the HttpClient.</param>
+    /// <param name="configureResilience">Optional action to configure resilience strategies. Applied only when EnableResilience is true.</param>
     /// <returns>The service collection for chaining.</returns>
-    public static IServiceCollection AddClient<TClient, TOptions>(
+    /// <remarks>
+    /// If <see cref="ClientOptions.EnableResilience"/> is false in the client options, 
+    /// no resilience strategies will be added regardless of the <paramref name="configureResilience"/> configuration.
+    /// </remarks>
+    public static IServiceCollection AddClient<T, TOptions>(
         this IServiceCollection services,
-        IConfiguration configuration,
-        string sectionName,
-        Func<TOptions, HttpClient, TClient> clientFactory,
-        Action<IHttpClientBuilder>? configureHttpClient = null)
-        where TClient : class
+        Action<TOptions> configureClientOptions,
+        Action<RefitSettings>? configureRefitSettings = null,
+        Action<HttpClient>? configureHttpClient = null,
+        Action<ResiliencePipelineBuilder<HttpResponseMessage>, TOptions>? configureResilience = null)
+        where T : class
         where TOptions : ClientOptions, new()
     {
-        ArgumentNullException.ThrowIfNull(services);
-        ArgumentNullException.ThrowIfNull(configuration);
-        ArgumentException.ThrowIfNullOrWhiteSpace(sectionName);
-        ArgumentNullException.ThrowIfNull(clientFactory);
+        services.AddCore();
+        services.Configure(configureClientOptions);
+        services.PostConfigure(ValidateOptions<TOptions>());
+        services.AddSingleton(sp => sp.GetRequiredService<IOptions<TOptions>>().Value);
+        services.AddSingleton<AuthenticationHandler<TOptions>>();
 
-        var options = new TOptions();
-        configuration.GetSection(sectionName).Bind(options);
+        var clientBuilder = services.AddRefitClient<T>(sp =>
+            {
+                var settings = sp.GetRequiredService<RefitSettings>();
+                configureRefitSettings?.Invoke(settings);
+                return settings;
+            })
+            .ConfigureHttpClient((sp, httpClient) =>
+            {
+                var options = sp.GetRequiredService<TOptions>();
+                httpClient.BaseAddress = new Uri(options.BaseUrl);
+                configureHttpClient?.Invoke(httpClient);
+            })
+            .AddRequestHandlers<TOptions>()
+            .AddResilienceHandler("ResilienceHandler", (builder, context) =>
+            {
+                var options = context.GetOptions<TOptions>();
 
-        return services.AddClient(options, clientFactory, configureHttpClient);
+                if (options.EnableResilience)
+                {
+                    // Add default strategies first
+                    builder.AddRetry(new RetryStrategyOptions<HttpResponseMessage>());
+                    builder.AddTimeout(new TimeoutStrategyOptions());
+                    builder.AddCircuitBreaker(new CircuitBreakerStrategyOptions<HttpResponseMessage>());
+
+                    // Allow user to customize or override with additional strategies
+                    configureResilience?.Invoke(builder, options);
+                }
+            });
+
+
+        return services;
+    }
+
+    /// <summary>
+    /// Registers a generic Refit client whose TOptions come from the given configuration section.
+    /// </summary>
+    /// <typeparam name="T">The Refit interface type to register.</typeparam>
+    /// <typeparam name="TOptions">The client options type.</typeparam>
+    /// <param name="services">The service collection to register services with.</param>
+    /// <param name="configurationSection">The configuration section to bind from.</param>
+    public static IServiceCollection AddClient<T, TOptions>(
+        this IServiceCollection services,
+        IConfigurationSection configurationSection,
+        Action<RefitSettings>? configureRefit = null,
+        Action<HttpClient>? configureHttpClient = null,
+        Action<ResiliencePipelineBuilder<HttpResponseMessage>, TOptions>? configureResilience = null)
+        where T : class
+        where TOptions : ClientOptions, new()
+        => services.AddClient<T, TOptions>(
+            configurationSection.Bind,
+            configureRefit,
+            configureHttpClient,
+            configureResilience
+        );
+
+    /// <summary>
+    /// Registers core Kontent.ai services including handlers, telemetry, and JSON settings.
+    /// This method is automatically called by AddClient().
+    /// </summary>
+    /// <param name="services">The service collection to register services with.</param>
+    /// <param name="configureCore">Optional action to configure core services.</param>
+    /// <returns>The service collection for chaining.</returns>
+    public static IServiceCollection AddCore(
+        this IServiceCollection services,
+        Action<CoreOptions>? configureCore = null)
+    {
+        services.AddOptions<CoreOptions>()
+                .Configure(opts => configureCore?.Invoke(opts));
+
+        services.TryAddSingleton(sp =>
+        {
+            var opts = sp.GetRequiredService<IOptions<CoreOptions>>().Value;
+            var settings = CoreOptions.CreateDefaultRefitSettings();
+            return settings;
+        });
+
+        services.TryAddSingleton(sp =>
+        {
+            var opts = sp.GetRequiredService<IOptions<CoreOptions>>().Value;
+            return opts.ApiUsageListener ?? DefaultApiUsageListener.Instance;
+        });
+
+        services.TryAddSingleton<TelemetryHandler>();
+        services.TryAddSingleton<TrackingHandler>();
+
+        return services;
+    }
+
+    /// <summary>
+    /// Creates a validation action for client options that wraps validation exceptions with more context.
+    /// </summary>
+    /// <typeparam name="TOptions">The client options type to validate.</typeparam>
+    /// <returns>An action that validates the options and provides better error messages.</returns>
+    private static Action<TOptions> ValidateOptions<TOptions>() where TOptions : ClientOptions
+    {
+        return options =>
+        {
+            try
+            {
+                options.Validate();
+            }
+            catch (Exception ex)
+            {
+                throw new InvalidOperationException(
+                    $"Client options validation failed: {ex.Message}", ex);
+            }
+        };
     }
 }

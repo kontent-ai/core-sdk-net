@@ -7,38 +7,115 @@
 [![Discord][discussion-shield]][discussion-url]
 
 > [!IMPORTANT]  
-> 🚧 This package is currently being developed. 🚧
+> 🚧 This package showcases the proposed architecture for the upcoming Kontent.ai .NET SDKs rewrite. 🚧
+> 
+> The Readme is AI generated for the review purposes. Simplified readme will be provided for the release.
 
 # Kontent.ai Core SDK for .NET
 
 ![License](https://img.shields.io/badge/License-MIT-blue.svg)
 ![.NET](https://img.shields.io/badge/.NET-8.0-purple.svg)
-![.NET](https://img.shields.io/badge/Build-Passing-green.svg)
+![Refit](https://img.shields.io/badge/HTTP-Refit-blue.svg)
 
-A foundational package for building Kontent.ai .NET SDKs with modern resilience, dependency injection, and HTTP client patterns using **factory delegates** instead of complex inheritance.
+A foundational package for building Kontent.ai .NET SDKs with **Refit at the core**, providing modern resilience, dependency injection, and declarative HTTP API patterns.
 
-## 🎯 **Purpose**
+## 🎯 **Architecture Vision for rewritten SDKs**
 
-This package provides **core abstractions and utilities** for SDK authors to build specific Kontent.ai SDKs (Delivery, Management, etc.). It is **not intended for direct use by end users** but rather as a foundation for other SDK packages.
+This package demonstrates the **proposed architecture change** for the upcoming Kontent.ai .NET SDK rewrite, moving from traditional HTTP client patterns to a **Refit-centered approach** with automatic infrastructure configuration.
 
-## ✨ **What's Included**
+### **Key Architectural Decisions**
 
-- 🏗️ **Factory Delegates**: Simple `Func<TOptions, HttpClient, TClient>` with direct HttpClient access
-- 🔄 **Default Resilience**: Built-in retry, circuit breaker, and timeout policies via Microsoft.Extensions.Http.Resilience
-- 🔌 **DI Integration**: Full support for .NET dependency injection patterns with both simple and factory registration
-- 📊 **Automatic Tracking**: SDK and source tracking headers (X-KC-SDKID, X-KC-SOURCE)
-- 🎯 **Authentication**: Automatic Bearer token handling via `AuthenticationHandler`
-- 📈 **Telemetry**: Pluggable API usage monitoring via `IApiUsageListener`
-- ⚙️ **Configuration**: Strongly-typed options with clean separation of concerns
+- **🔥 Refit as HTTP Foundation**: All HTTP communication through declarative Refit interfaces
+- **⚡ Zero Boilerplate**: Automatic configuration of authentication, tracking, resilience, and JSON serialization  
+- **🏗️ Composable Design**: Clean separation between HTTP layer (Refit) and business logic
+- **🔧 Smart Defaults**: Production-ready configuration with minimal setup required
+- **📦 Infrastructure as a Service**: Core package handles all cross-cutting concerns
 
-## 🚀 **Quick Start for SDK Authors**
+## ✨ **What This Core Package Provides**
 
-### **1. Create Your Client Options**
+- **🌐 Refit Integration**: Seamless registration and configuration of Refit clients
+- **🔐 Authentication**: Automatic Bearer token injection via `AuthenticationHandler<TOptions>`
+- **📊 Tracking**: SDK and source tracking headers (X-KC-SDKID, X-KC-SOURCE) via `TrackingHandler`
+- **📈 Telemetry**: Pluggable API monitoring via `IApiUsageListener` and `TelemetryHandler`
+- **🛡️ Resilience**: Built-in retry, circuit breaker, and timeout policies (can be disabled via `EnableResilience = false`)
+- **⚙️ JSON Configuration**: Optimized JSON serialization settings for Kontent.ai APIs
+- **🔌 DI Integration**: Full .NET dependency injection support with strongly-typed options
+
+## 🚀 **SDK Author Guide: Building on Refit**
+
+### **1. Define Your Refit API Interface**
+
+The new architecture starts with **declarative Refit interfaces** instead of manual HTTP client code:
+
+```csharp
+using Refit;
+
+// Delivery API Example
+public interface IDeliveryApi
+{
+    [Get("/{environmentId}/items")]
+    Task<ItemsResponse<TItem>> GetItemsAsync<TItem>(
+        string environmentId,
+        [Query] string? elements = null,
+        [Query] string? filter = null,
+        [Query] int? skip = null,
+        [Query] int? limit = null,
+        CancellationToken cancellationToken = default);
+
+    [Get("/{environmentId}/items/{codename}")]
+    Task<ItemResponse<TItem>> GetItemAsync<TItem>(
+        string environmentId, 
+        string codename,
+        [Query] string? elements = null,
+        CancellationToken cancellationToken = default);
+
+    [Get("/{environmentId}/types")]
+    Task<TypesResponse> GetTypesAsync(
+        string environmentId,
+        [Query] int? skip = null,
+        [Query] int? limit = null,
+        CancellationToken cancellationToken = default);
+}
+
+// Management API Example
+public interface IManagementApi
+{
+    [Get("/v2/projects/{environmentId}/items")]
+    Task<ItemsResponse> GetItemsAsync(
+        string environmentId,
+        [Query] int? skip = null,
+        [Query] int? limit = null,
+        CancellationToken cancellationToken = default);
+
+    [Post("/v2/projects/{environmentId}/items")]
+    Task<ItemResponse> CreateItemAsync(
+        string environmentId,
+        [Body] CreateItemRequest request,
+        CancellationToken cancellationToken = default);
+
+    [Put("/v2/projects/{environmentId}/items/{itemId}")]
+    Task<ItemResponse> UpdateItemAsync(
+        string environmentId,
+        string itemId,
+        [Body] UpdateItemRequest request,
+        CancellationToken cancellationToken = default);
+
+    [Delete("/v2/projects/{environmentId}/items/{itemId}")]
+    Task DeleteItemAsync(
+        string environmentId,
+        string itemId,
+        CancellationToken cancellationToken = default);
+}
+```
+
+### **2. Create Client Options**
+
+Define strongly-typed configuration options that extend the base `ClientOptions`:
 
 ```csharp
 using Kontent.Ai.Core.Configuration;
 
-// For simple single-client scenarios
+// Delivery SDK Options
 public class DeliveryClientOptions : ClientOptions
 {
     /// <summary>
@@ -67,95 +144,121 @@ public class DeliveryClientOptions : ClientOptions
     }
 }
 
-// For multiple named client scenarios (factory pattern)
-public class DeliveryNamedClientOptions : NamedClientOptions
+// Management SDK Options  
+public class ManagementClientOptions : ClientOptions
 {
-    public bool UsePreviewApi { get; set; } = false;
-    public string? PreviewApiKey { get; set; }
-    public bool IncludeTotalCount { get; set; } = false;
+    /// <summary>
+    /// Management API key for write operations.
+    /// </summary>
+    public string? ManagementApiKey { get; set; }
+
+    /// <summary>
+    /// Whether to use the production Management API endpoint.
+    /// </summary>
+    public bool UseProductionApi { get; set; } = true;
 
     public override void Validate()
     {
-        base.Validate(); // Validates EnvironmentId, BaseUrl, HttpClientName, etc.
-
-        if (UsePreviewApi && string.IsNullOrEmpty(PreviewApiKey))
+        base.Validate();
+        
+        if (string.IsNullOrEmpty(ManagementApiKey))
         {
-            throw new ArgumentException("Preview API key is required when UsePreviewApi is true.", nameof(PreviewApiKey));
+            throw new ArgumentException("Management API key is required.", nameof(ManagementApiKey));
         }
     }
 }
 ```
 
-### **2. Create Your Client Implementation**
+### **3. Create Your Client Implementation**
+
+Build your client around the Refit interface, with **zero HTTP boilerplate**:
 
 ```csharp
-using Kontent.Ai.Core.Abstractions;
 using Microsoft.Extensions.Options;
 
+// Delivery Client
 public class DeliveryClient
 {
-    private readonly HttpClient _httpClient;
+    private readonly IDeliveryApi _api;
     private readonly DeliveryClientOptions _options;
 
-    // Primary constructor for factory scenarios (gets HttpClient from factory)
-    public DeliveryClient(DeliveryClientOptions options, HttpClient httpClient)
+    public DeliveryClient(IDeliveryApi api, IOptions<DeliveryClientOptions> options)
     {
-        _options = options ?? throw new ArgumentNullException(nameof(options));
-        _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
-        _options.Validate();
+        _api = api ?? throw new ArgumentNullException(nameof(api));
+        _options = options?.Value ?? throw new ArgumentNullException(nameof(options));
     }
 
-    // Constructor for DI scenarios (uses IHttpClientFactory internally)
-    public DeliveryClient(IOptions<DeliveryClientOptions> options, IHttpClientFactory httpClientFactory)
-        : this(options.Value, httpClientFactory.CreateClient("kontent-ai-deliveryclient"))
-    {
-    }
-
-    // Your SDK methods using HttpClient directly
-    public async Task<TItem> GetItemAsync<TItem>(string codename, CancellationToken cancellationToken = default)
-    {
-        var endpoint = $"/{_options.EnvironmentId}/items/{codename}";
-        
-        var request = new HttpRequestMessage(HttpMethod.Get, endpoint);
-        
-        if (_options.UsePreviewApi)
-        {
-            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _options.PreviewApiKey);
-        }
-
-        var response = await _httpClient.SendAsync(request, cancellationToken);
-        response.EnsureSuccessStatusCode();
-        
-        var json = await response.Content.ReadAsStringAsync(cancellationToken);
-        return JsonSerializer.Deserialize<TItem>(json, new JsonSerializerOptions 
-        { 
-            PropertyNamingPolicy = JsonNamingPolicy.CamelCase 
-        })!;
-    }
-
-    public async Task<ItemsResponse<TItem>> GetItemsAsync<TItem>(
+    // Business logic methods that delegate to Refit interface
+    public async Task<TItem[]> GetItemsAsync<TItem>(
         string? filter = null, 
+        int? limit = null,
         CancellationToken cancellationToken = default)
     {
-        var endpoint = $"/{_options.EnvironmentId}/items";
-        if (!string.IsNullOrEmpty(filter))
-        {
-            endpoint += $"?{filter}";
-        }
+        var response = await _api.GetItemsAsync<TItem>(
+            _options.EnvironmentId,
+            filter: filter,
+            limit: limit,
+            cancellationToken: cancellationToken);
 
-        var response = await _httpClient.GetAsync(endpoint, cancellationToken);
-        response.EnsureSuccessStatusCode();
-        
-        var json = await response.Content.ReadAsStringAsync(cancellationToken);
-        return JsonSerializer.Deserialize<ItemsResponse<TItem>>(json, new JsonSerializerOptions 
-        { 
-            PropertyNamingPolicy = JsonNamingPolicy.CamelCase 
-        })!;
+        return response.Items;
+    }
+
+    public async Task<TItem> GetItemAsync<TItem>(
+        string codename, 
+        CancellationToken cancellationToken = default)
+    {
+        var response = await _api.GetItemAsync<TItem>(
+            _options.EnvironmentId, 
+            codename, 
+            cancellationToken: cancellationToken);
+
+        return response.Item;
+    }
+}
+
+// Management Client - Shows different patterns for write operations
+public class ManagementClient
+{
+    private readonly IManagementApi _api;
+    private readonly ManagementClientOptions _options;
+
+    public ManagementClient(IManagementApi api, IOptions<ManagementClientOptions> options)
+    {
+        _api = api ?? throw new ArgumentNullException(nameof(api));
+        _options = options?.Value ?? throw new ArgumentNullException(nameof(options));
+    }
+
+    public async Task<ContentItem> CreateItemAsync(
+        CreateItemRequest request, 
+        CancellationToken cancellationToken = default)
+    {
+        var response = await _api.CreateItemAsync(
+            _options.EnvironmentId, 
+            request, 
+            cancellationToken);
+
+        return response.Item;
+    }
+
+    public async Task<ContentItem> UpdateItemAsync(
+        string itemId,
+        UpdateItemRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var response = await _api.UpdateItemAsync(
+            _options.EnvironmentId,
+            itemId,
+            request,
+            cancellationToken);
+
+        return response.Item;
     }
 }
 ```
 
-### **3. Create Your Registration Extensions**
+### **4. Register Everything with the Core Package**
+
+The core package handles **all the infrastructure setup** - you just register your Refit interface and client:
 
 ```csharp
 using Kontent.Ai.Core.Extensions;
@@ -163,145 +266,156 @@ using Kontent.Ai.Core.Extensions;
 public static class ServiceCollectionExtensions
 {
     /// <summary>
-    /// Registers the Delivery SDK with simple configuration (singleton pattern).
-    /// Most users will use this method for single-environment scenarios.
+    /// Registers the Delivery SDK with the new Refit-based architecture.
     /// </summary>
     public static IServiceCollection AddKontentDelivery(
         this IServiceCollection services,
-        DeliveryClientOptions options)
+        Action<DeliveryClientOptions> configureOptions)
     {
-        // Register core services first (handlers, tracking, telemetry)
-        services.AddCoreServices();
-        
-        // Register client using simple pattern with automatic HttpClient naming
-        return services.AddClient<DeliveryClient, DeliveryClientOptions>(
-            options,
-            (opts, httpClient) => new DeliveryClient(opts, httpClient), // Factory delegate with HttpClient
-            httpClientBuilder =>
-            {
-                // Add delivery-specific configuration
-                httpClientBuilder.ConfigureHttpClient(client =>
-                {
-                    client.DefaultRequestHeaders.Add("Accept", "application/json");
-                });
-            });
-    }
-
-    /// <summary>
-    /// Registers the Delivery SDK with configuration delegate.
-    /// </summary>
-    public static IServiceCollection AddKontentDelivery(
-        this IServiceCollection services,
-        Action<DeliveryClientOptions> configureOptions,
-        Action<IHttpClientBuilder>? configureHttpClient = null)
-    {
-        services.AddCoreServices();
-        
-        return services.AddClient<DeliveryClient, DeliveryClientOptions>(
+        // Register the Refit interface with all Kontent.ai infrastructure
+        services.AddClient<IDeliveryApi, DeliveryClientOptions>(
             configureOptions,
-            (opts, httpClient) => new DeliveryClient(opts, httpClient),
-            configureHttpClient);
+            configureRefitSettings: settings =>
+            {
+                // Customize Refit settings if needed
+                // Default settings are already optimized for Kontent.ai
+            },
+            configureHttpClient: httpClient =>
+            {
+                // Add any delivery-specific HTTP configuration
+                httpClient.DefaultRequestHeaders.Add("Accept", "application/json");
+            });
+
+        // Register the business logic client
+        services.AddTransient<DeliveryClient>();
+
+        return services;
     }
 
     /// <summary>
-    /// Registers the Delivery SDK with factory pattern for multiple configurations.
-    /// Advanced users can configure multiple environments (prod, staging, dev).
+    /// Registers the Management SDK with write-operation optimized settings.
     /// </summary>
-    public static IServiceCollection AddKontentDeliveryFactory(
+    public static IServiceCollection AddKontentManagement(
         this IServiceCollection services,
-        Action<ClientFactoryBuilder<DeliveryClient, DeliveryNamedClientOptions>> configureFactory)
+        Action<ManagementClientOptions> configureOptions)
     {
-        services.AddCoreServices();
-        
-        return services.AddMultipleClientFactory<DeliveryClient, DeliveryNamedClientOptions>(
-            (opts, httpClient) => new DeliveryClient(opts, httpClient), // Factory delegate with HttpClient
-            configureFactory);
+        services.AddClient<IManagementApi, ManagementClientOptions>(
+            configureOptions,
+            configureResilience: (builder, clientOptions) =>
+            {
+                // Note: Default strategies (retry, timeout, circuit breaker) are already added
+                // For write operations, you might want to add additional conservative strategies
+                // or customize behavior based on client options
+            });
+
+        services.AddTransient<ManagementClient>();
+        return services;
     }
 }
 ```
 
-## 📋 **Core Abstractions**
+## 🏗️ **Core Architecture Components**
 
-### **ClientOptions**
+### **AddClient<T, TOptions>() - The Magic Method**
 
-Base class for all SDK-specific options with simple resilience control:
+This is the core registration method that wraps Refit with all Kontent.ai infrastructure:
+
+```csharp
+// What happens under the hood when you call AddClient:
+services.AddClient<IDeliveryApi, DeliveryClientOptions>(configureOptions)
+// 1. Registers core services (handlers, telemetry, JSON settings)
+// 2. Configures and validates your options  
+// 3. Registers Refit client with optimized settings
+// 4. Adds authentication handler (Bearer token from options.ApiKey)
+// 5. Adds tracking handler (X-KC-SDKID, X-KC-SOURCE headers)
+// 6. Adds telemetry handler (IApiUsageListener notifications)
+// 7. Configures resilience policies (retry, circuit breaker, timeout)
+// 8. Sets up JSON serialization (camelCase, null handling, etc.)
+```
+
+### **Automatic Infrastructure Pipeline**
+
+Every Refit client gets this request/response pipeline automatically:
+
+```
+HTTP Request → Authentication → Tracking → Telemetry → Resilience → Refit → Kontent.ai API
+                    ↓              ↓          ↓           ↓         ↓
+              Bearer Token    SDK Headers  Monitoring   Retry    JSON Mapping
+```
+
+### **ClientOptions Base Class**
+
+All SDK options inherit from this foundation:
 
 ```csharp
 public abstract class ClientOptions
 {
-    public required string EnvironmentId { get; set; }           // Your Kontent.ai environment
-    public string? ApiKey { get; set; }                          // Handled by AuthenticationHandler
-    public required string BaseUrl { get; set; }                // API base URL
-    
-    // Simple resilience control - just enable/disable defaults
-    public bool EnableDefaultResilience { get; set; } = true;   // Default: enabled with sensible settings
+    /// <summary>
+    /// Your Kontent.ai environment identifier (required).
+    /// </summary>
+    public required string EnvironmentId { get; set; }
+
+    /// <summary>
+    /// The base URL for the Kontent.ai API (required).
+    /// </summary>
+    public required string BaseUrl { get; set; }
+
+    /// <summary>
+    /// API key for authentication (automatically applied as Bearer token).
+    /// </summary>
+    public string? ApiKey { get; set; }
+
+    /// <summary>
+    /// Gets or sets whether to enable resilience handling (default: true).
+    /// When false, no retry, circuit breaker, or timeout policies are applied.
+    /// </summary>
+    public bool EnableResilience { get; set; } = true;
+
+    /// <summary>
+    /// Validates the client options configuration.
+    /// Override this in derived classes to add custom validation.
+    /// </summary>
+    public virtual void Validate() { /* Implementation */ }
 }
 ```
 
-### **NamedClientOptions**
+## 🛠️ **Usage Examples for SDK Consumers**
 
-Extended class for factory scenarios requiring HttpClient naming:
-
-```csharp
-public abstract class NamedClientOptions : ClientOptions
-{
-    public required string HttpClientName { get; set; }         // HttpClient name for factory scenarios
-}
-```
-
-### **IMultipleClientFactory<TClient, TOptions>**
-
-Factory interface for multi-client scenarios:
+### **Simple Registration**
 
 ```csharp
-public interface IMultipleClientFactory<TClient, TOptions> where TOptions : NamedClientOptions
+// Program.cs - Minimal setup
+builder.Services.AddKontentDelivery(options =>
 {
-    TClient CreateClient(string name);                           // Named configuration
-    IEnumerable<string> GetRegisteredClientNames();             // List all names
-    bool IsClientRegistered(string name);                       // Check if exists
-}
-```
+    options.EnvironmentId = "your-environment-id";
+    options.BaseUrl = "https://deliver.kontent.ai";
+    options.UsePreviewApi = false;
+});
 
-### **IApiUsageListener**
-
-Interface for telemetry and monitoring:
-
-```csharp
-public interface IApiUsageListener
+// Usage in controllers/services
+public class ProductController(DeliveryClient deliveryClient)
 {
-    Task OnRequestStartAsync(HttpRequestMessage request, CancellationToken cancellationToken = default);
-    Task OnRequestEndAsync(HttpRequestMessage request, HttpResponseMessage? response, 
-        Exception? exception, TimeSpan elapsed, CancellationToken cancellationToken = default);
-}
-```
-
-## 🔧 **Registration Patterns**
-
-### **Simple Registration (Singleton Pattern)**
-
-```csharp
-// Program.cs - Most common usage
-var deliveryOptions = new DeliveryClientOptions
-{
-    EnvironmentId = "your-env-id",
-    BaseUrl = "https://deliver.kontent.ai/",
-    EnableDefaultResilience = true,    // Simple on/off switch for default policies
-};
-
-builder.Services.AddKontentDelivery(deliveryOptions);
-
-// Usage - Direct injection
-public class MyController(DeliveryClient deliveryClient)
-{
-    public async Task<IActionResult> GetItem(string codename)
+    public async Task<IActionResult> GetProducts()
     {
-        var item = await deliveryClient.GetItemAsync<ContentItem>(codename);
-        return Ok(item);
+        var products = await deliveryClient.GetItemsAsync<Product>();
+        return Ok(products);
     }
 }
 ```
 
-### **Configuration-based Registration**
+### **Disabling Resilience**
+
+```csharp
+// For scenarios where you want to handle resilience yourself or in testing
+builder.Services.AddKontentDelivery(options =>
+{
+    options.EnvironmentId = "your-environment-id";
+    options.BaseUrl = "https://deliver.kontent.ai";
+    options.EnableResilience = false; // Disables retry, circuit breaker, and timeout policies
+});
+```
+
+### **Configuration-based Setup**
 
 ```csharp
 // appsettings.json
@@ -309,302 +423,538 @@ public class MyController(DeliveryClient deliveryClient)
   "Kontent": {
     "Delivery": {
       "EnvironmentId": "your-env-id",
-      "BaseUrl": "https://deliver.kontent.ai/",
-      "EnableDefaultResilience": true,
+      "BaseUrl": "https://deliver.kontent.ai",
       "UsePreviewApi": false
+    },
+    "Management": {
+      "EnvironmentId": "your-env-id", 
+      "BaseUrl": "https://manage.kontent.ai",
+      "ManagementApiKey": "your-management-key"
     }
   }
 }
 
 // Program.cs
-builder.Services.Configure<DeliveryClientOptions>(
-    builder.Configuration.GetSection("Kontent:Delivery"));
-
-var options = builder.Configuration.GetSection("Kontent:Delivery").Get<DeliveryClientOptions>()!;
-builder.Services.AddKontentDelivery(options);
+builder.Services.AddKontentDelivery(builder.Configuration.GetSection("Kontent:Delivery").Bind);
+builder.Services.AddKontentManagement(builder.Configuration.GetSection("Kontent:Management").Bind);
 ```
 
-### **Multiple Clients (Factory Pattern)**
+### **Advanced Customization**
 
 ```csharp
-// Program.cs - Multiple environments
-builder.Services.AddKontentDeliveryFactory(factory =>
+// Custom telemetry, resilience, and Refit settings
+builder.Services.AddCore(coreOptions =>
 {
-    factory.AddClient("production", opts =>
-    {
-        opts.EnvironmentId = "prod-env-id";
-        opts.BaseUrl = "https://deliver.kontent.ai/";
-        opts.ApiKey = "prod-api-key";
-        opts.HttpClientName = "kontent-ai-client-production";
-        opts.EnableDefaultResilience = true;  // Use defaults for production
-    });
-    
-    factory.AddClient("staging", opts =>
-    {
-        opts.EnvironmentId = "staging-env-id";
-        opts.BaseUrl = "https://deliver.kontent.ai/";
-        opts.ApiKey = "staging-api-key";
-        opts.HttpClientName = "kontent-ai-client-staging";
-        opts.EnableDefaultResilience = true;  // Use defaults for staging
-    });
-    
-    factory.AddClient("development", opts =>
-    {
-        opts.EnvironmentId = "dev-env-id";
-        opts.BaseUrl = "https://deliver.kontent.ai/";
-        opts.HttpClientName = "kontent-ai-client-development";
-        opts.EnableDefaultResilience = false; // No resilience for development
-    }, configureResilience: httpClientBuilder =>
-    {
-        // Custom resilience for development (if needed)
-        httpClientBuilder.AddDefaultResilienceHandler(new ResilienceOptions
-        {
-            EnableRetry = false,
-            EnableCircuitBreaker = false,
-            EnableTimeout = true
-        });
-    });
+    coreOptions.ApiUsageListener = new CustomTelemetryListener();
+    coreOptions.SdkIdentity = new SdkIdentity("MyApp.Integration", new Version(2, 1, 0));
 });
 
-// Usage with factory
-public class MyService(IMultipleClientFactory<DeliveryClient, DeliveryNamedClientOptions> factory)
-{
-    public async Task<ContentItem> GetItemFromEnvironment(string environment, string codename)
+builder.Services.AddKontentDelivery(
+    options =>
     {
-        var client = factory.CreateClient(environment);
-        return await client.GetItemAsync<ContentItem>(codename);
+        options.EnvironmentId = "production-env";
+        options.BaseUrl = "https://deliver.kontent.ai";
+    },
+    configureRefitSettings: settings =>
+    {
+        // Customize JSON serialization
+        settings.ContentSerializer = new CustomJsonContentSerializer();
+    },
+    configureResilience: (builder, clientOptions) =>
+    {
+        // Custom retry strategy for high-traffic scenarios
+        builder.AddRetry(r =>
+        {
+            r.MaxRetryAttempts = 5;
+            r.BaseDelay = TimeSpan.FromMilliseconds(100);
+        });
+    });
+```
+
+## 🔧 **Refit Configuration & JSON Handling**
+
+### **Default Refit Settings**
+
+The core package provides optimized defaults for Kontent.ai APIs:
+
+```csharp
+// Automatically configured by CoreOptions.CreateDefaultRefitSettings()
+var jsonOptions = new JsonSerializerOptions
+{
+    PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+    DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+    PropertyNameCaseInsensitive = true,
+    ReadCommentHandling = JsonCommentHandling.Skip,
+    AllowTrailingCommas = true
+};
+
+var refitSettings = new RefitSettings
+{
+    ContentSerializer = new SystemTextJsonContentSerializer(jsonOptions)
+};
+```
+
+### **Authentication Handling**
+
+Authentication is **completely automatic** - just set `ApiKey` in your options:
+
+```csharp
+// For Delivery API (Preview)
+services.AddKontentDelivery(options =>
+{
+    options.ApiKey = "your-preview-api-key"; // Automatically becomes "Bearer your-preview-api-key"
+});
+
+// For Management API
+services.AddKontentManagement(options =>
+{
+    options.ApiKey = "your-management-api-key"; // Automatically becomes "Bearer your-management-api-key"
+});
+```
+
+## 📊 **Monitoring & Telemetry**
+
+### **Built-in API Usage Tracking**
+
+Every request is automatically monitored through `IApiUsageListener`:
+
+```csharp
+// Implement custom telemetry
+public class ApplicationInsightsTelemetry : IApiUsageListener
+{
+    public async Task OnRequestStartAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+    {
+        // Log request start, add correlation IDs, etc.
+    }
+
+    public async Task OnRequestEndAsync(
+        HttpRequestMessage request, 
+        HttpResponseMessage? response, 
+        Exception? exception, 
+        TimeSpan elapsed, 
+        CancellationToken cancellationToken)
+    {
+        // Log performance metrics, errors, response times
+        // Track API usage patterns, rate limiting, etc.
+    }
+}
+
+// Register your telemetry
+services.AddCore(options =>
+{
+    options.ApiUsageListener = new ApplicationInsightsTelemetry();
+});
+```
+
+### **Automatic Headers**
+
+Every request gets proper tracking headers automatically:
+
+```
+X-KC-SDKID: nuget.org;Kontent.Ai.Delivery;2.0.0
+X-KC-SOURCE: nuget.org;MyApp;1.5.2
+```
+
+## 🛡️ **Resilience & Error Handling**
+
+### **Production-Ready Defaults**
+
+All HTTP clients get automatic resilience policies by default (when `EnableResilience = true`):
+
+- **Retry Policy**: Automatic retry with exponential backoff
+- **Circuit Breaker**: Prevents cascading failures
+- **Timeout**: Per-request timeout handling
+
+**Note**: Resilience can be completely disabled by setting `EnableResilience = false` in your client options, which removes all retry, circuit breaker, and timeout policies.
+
+### **Customizable Per SDK**
+
+```csharp
+// Different resilience for read vs write operations
+services.AddKontentDelivery(options => { /* ... */ }); // Uses defaults (good for reads)
+
+services.AddKontentManagement(
+    options => { /* ... */ },
+    configureResilience: (builder, clientOptions) =>
+    {
+        // Conservative settings for write operations - you have access to the pipeline builder
+        // Note: Default strategies (retry, timeout, circuit breaker) are already added
+        // You can add additional strategies or customize existing ones
+    });
+```
+
+## 🔄 **Migration Benefits from Current SDKs**
+
+### **Before: Manual HTTP Client Management**
+```csharp
+// Old approach - lots of boilerplate
+public class DeliveryClient
+{
+    private readonly HttpClient _httpClient;
+    
+    public async Task<T> GetItemAsync<T>(string codename)
+    {
+        var request = new HttpRequestMessage(HttpMethod.Get, $"/{environmentId}/items/{codename}");
+        
+        // Manual authentication
+        if (!string.IsNullOrEmpty(apiKey))
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
+            
+        // Manual headers
+        request.Headers.Add("X-KC-SDKID", sdkTrackingValue);
+        
+        // Manual error handling
+        var response = await _httpClient.SendAsync(request);
+        response.EnsureSuccessStatusCode();
+        
+        // Manual JSON deserialization
+        var json = await response.Content.ReadAsStringAsync();
+        return JsonSerializer.Deserialize<T>(json, jsonOptions);
     }
 }
 ```
 
-### **Custom Resilience Configuration**
-
+### **After: Refit-Based Declarative APIs**
 ```csharp
-// Program.cs - Custom resilience for high-traffic scenarios
-var deliveryOptions = new DeliveryClientOptions
+// New approach - clean and declarative
+public interface IDeliveryApi
 {
-    EnvironmentId = "your-env-id",
-    BaseUrl = "https://deliver.kontent.ai/",
-    EnableDefaultResilience = false  // Disable defaults to use custom configuration
-};
+    [Get("/{environmentId}/items/{codename}")]
+    Task<ItemResponse<T>> GetItemAsync<T>(string environmentId, string codename);
+}
 
-builder.Services.AddKontentDelivery(deliveryOptions, httpClientBuilder =>
+public class DeliveryClient
 {
-    // Custom resilience configuration
-    httpClientBuilder.AddDefaultResilienceHandler(new ResilienceOptions
+    private readonly IDeliveryApi _api;
+    
+    public async Task<T> GetItemAsync<T>(string codename)
     {
-        EnableRetry = true,
-        EnableCircuitBreaker = true,
-        EnableTimeout = true,
-        Retry = new RetryOptions
-        {
-            MaxRetryAttempts = 10,
-            BaseDelay = TimeSpan.FromMilliseconds(200),
-            UseJitter = true,
-            UseExponentialBackoff = true
-        },
-        CircuitBreaker = new CircuitBreakerOptions
-        {
-            FailureRatio = 0.2,
-            BreakDuration = TimeSpan.FromMinutes(2)
-        },
-        Timeout = new TimeoutOptions
-        {
-            Timeout = TimeSpan.FromMinutes(5)
-        }
-    });
-});
+        var response = await _api.GetItemAsync<T>(_options.EnvironmentId, codename);
+        return response.Item;
+        // Authentication, headers, JSON, error handling, resilience = all automatic!
+    }
+}
 ```
 
-## 🏭 **Available Extension Methods**
+### **Key Improvements**
 
-### **Core Services Registration**
-- `AddCoreServices(CoreServicesOptions?)` - Registers handlers, tracking, telemetry, JSON options
+1. **90% Less Boilerplate**: Refit handles HTTP mechanics automatically
+2. **Type Safety**: Compile-time validation of API contracts
+3. **Testability**: Easy to mock Refit interfaces for unit tests
+4. **Maintainability**: API changes are centralized in interfaces
+5. **Performance**: Optimized JSON settings and HTTP client reuse
+6. **Reliability**: Built-in resilience and monitoring
 
-### **Client Registration**
-- `AddClient<TClient, TOptions>(options, factory, configure?)` - Simple singleton registration with auto-generated HttpClient name
-- `AddClient<TClient, TOptions>(configureOptions, factory, configure?)` - Configuration delegate variant
-- `AddMultipleClientFactory<TClient, TOptions>(factory, configure)` - Multi-client factory registration
+## 🎯 **Review Goals: What We're Proposing**
 
-### **Resilience Configuration**
-- `AddDefaultResilienceHandler(ResilienceOptions?)` - Apply Kontent.ai-optimized resilience policies
+This architecture demonstrates our vision for **Kontent.ai .NET SDK v2**:
 
-### **Handler Registration**
-- `AddRequestHandlers()` - Adds authentication, tracking, and telemetry handlers in correct order
-- `AddRequestHandlers<TOptions>()` - Type-safe handler registration for specific options
+### **✅ For SDK Authors**
+- **Faster Development**: Focus on business logic, not HTTP plumbing
+- **Consistency**: All SDKs use the same infrastructure and patterns  
+- **Reliability**: Production-ready resilience and monitoring out of the box
+- **Maintainability**: Declarative APIs are easier to evolve and test
 
-## 🛡️ **Default Resilience Policies**
+### **✅ For SDK Users**
+- **Simpler Setup**: Minimal configuration with smart defaults
+- **Better Performance**: Optimized HTTP clients and JSON serialization
+- **Built-in Monitoring**: Telemetry and tracking without extra work
+- **Production Ready**: Resilience policies tuned for Kontent.ai APIs
 
-When `EnableDefaultResilience = true` (default), your HttpClients automatically get:
+### **✅ For the Platform**
+- **Unified Telemetry**: Consistent tracking across all .NET SDKs
+- **Better Support**: Detailed request/response logging and error context
+- **Performance Insights**: Built-in metrics for API usage patterns
 
-### **Retry Policy**
-- **MaxRetryAttempts**: 3 attempts
-- **Delay**: Exponential backoff starting from 1 second
-- **Jitter**: Enabled to prevent thundering herd
-- **Handles**: HTTP 5xx, 408 (timeout), 429 (rate limit), network errors
+**The goal is to move from "HTTP client library" to "declarative API SDK framework" that handles all the infrastructure concerns automatically while providing a clean, type-safe developer experience.**
 
-### **Circuit Breaker**
-- **FailureRatio**: 50% failures trigger circuit break
-- **SamplingDuration**: 30 seconds
-- **MinimumThroughput**: 10 requests before evaluation
-- **BreakDuration**: 30 seconds
+---
 
-### **Timeout**
-- **TotalRequestTimeout**: 30 seconds per request
+## 📚 **Complete Integration Examples**
 
-All default values are optimized for Kontent.ai APIs based on real-world usage patterns.
+> [!NOTE]
+> These are **example implementations** showing how delivery and management SDKs would integrate with this core package. The actual implementation details may differ.
 
-## 🎯 **Best Practices for SDK Authors**
-
-1. **Use Factory Delegates**: Simple `Func<TOptions, HttpClient, TClient>` with direct HttpClient access
-2. **Extend Appropriate Base**: Use `ClientOptions` for simple scenarios, `NamedClientOptions` for factory scenarios
-3. **Call AddCoreServices()**: Register core services before your specific SDK services
-4. **Support Multiple Patterns**: Provide both simple and factory registration methods
-5. **Validate Options**: Override `ClientOptions.Validate()` for your requirements
-6. **Use HttpClient Directly**: No need for additional abstractions - direct HttpClient usage is encouraged
-7. **Configure Authentication**: Use the built-in `AuthenticationHandler` for Bearer tokens
-8. **Keep Configuration Simple**: Use `EnableDefaultResilience` boolean for most users, advanced users can configure custom resilience
-
-## 📚 **Complete Example: Management SDK**
+<details>
+<summary><strong>📦 Example: Complete Delivery SDK Implementation</strong></summary>
 
 ```csharp
-// ManagementClientOptions.cs - Simple version
+// 1. Refit API Interface
+public interface IDeliveryApi
+{
+    [Get("/{environmentId}/items")]
+    Task<ItemsResponse<TItem>> GetItemsAsync<TItem>(
+        string environmentId,
+        [Query] string? elements = null,
+        [Query] string? filter = null,
+        [Query] int? skip = null,
+        [Query] int? limit = null,
+        CancellationToken cancellationToken = default);
+
+    [Get("/{environmentId}/items/{codename}")]
+    Task<ItemResponse<TItem>> GetItemAsync<TItem>(
+        string environmentId,
+        string codename,
+        [Query] string? elements = null,
+        CancellationToken cancellationToken = default);
+
+    [Get("/{environmentId}/types")]
+    Task<TypesResponse> GetTypesAsync(
+        string environmentId,
+        [Query] int? skip = null,
+        [Query] int? limit = null,
+        CancellationToken cancellationToken = default);
+}
+
+// 2. Options Configuration
+public class DeliveryClientOptions : ClientOptions
+{
+    public bool UsePreviewApi { get; set; } = false;
+    public string? PreviewApiKey { get; set; }
+    public bool IncludeTotalCount { get; set; } = false;
+
+    public override void Validate()
+    {
+        base.Validate();
+        if (UsePreviewApi && string.IsNullOrEmpty(PreviewApiKey))
+        {
+            throw new ArgumentException("Preview API key is required when UsePreviewApi is true.");
+        }
+    }
+}
+
+// 3. Client Implementation
+public class DeliveryClient
+{
+    private readonly IDeliveryApi _api;
+    private readonly DeliveryClientOptions _options;
+
+    public DeliveryClient(IDeliveryApi api, IOptions<DeliveryClientOptions> options)
+    {
+        _api = api;
+        _options = options.Value;
+    }
+
+    public async Task<IEnumerable<TItem>> GetItemsAsync<TItem>(
+        string? filter = null,
+        int? limit = null,
+        CancellationToken cancellationToken = default)
+    {
+        var response = await _api.GetItemsAsync<TItem>(
+            _options.EnvironmentId,
+            filter: filter,
+            limit: limit,
+            cancellationToken: cancellationToken);
+
+        return response.Items;
+    }
+
+    public async Task<TItem> GetItemAsync<TItem>(
+        string codename,
+        CancellationToken cancellationToken = default)
+    {
+        var response = await _api.GetItemAsync<TItem>(
+            _options.EnvironmentId,
+            codename,
+            cancellationToken: cancellationToken);
+
+        return response.Item;
+    }
+}
+
+// 4. Registration Extensions
+public static class ServiceCollectionExtensions
+{
+    public static IServiceCollection AddKontentDelivery(
+        this IServiceCollection services,
+        Action<DeliveryClientOptions> configureOptions)
+    {
+        services.AddClient<IDeliveryApi, DeliveryClientOptions>(configureOptions);
+        services.AddTransient<DeliveryClient>();
+        return services;
+    }
+}
+
+// 5. Usage
+// Program.cs
+builder.Services.AddKontentDelivery(options =>
+{
+    options.EnvironmentId = "your-env-id";
+    options.BaseUrl = "https://deliver.kontent.ai";
+    options.UsePreviewApi = true;
+    options.PreviewApiKey = "your-preview-key";
+});
+
+// Controller
+public class ProductController(DeliveryClient deliveryClient)
+{
+    public async Task<IActionResult> GetProducts()
+    {
+        var products = await deliveryClient.GetItemsAsync<Product>(limit: 10);
+        return Ok(products);
+    }
+}
+```
+
+</details>
+
+<details>
+<summary><strong>⚙️ Example: Complete Management SDK Implementation</strong></summary>
+
+```csharp
+// 1. Refit API Interface
+public interface IManagementApi
+{
+    [Get("/v2/projects/{environmentId}/items")]
+    Task<ItemsResponse> GetItemsAsync(
+        string environmentId,
+        [Query] int? skip = null,
+        [Query] int? limit = null,
+        CancellationToken cancellationToken = default);
+
+    [Post("/v2/projects/{environmentId}/items")]
+    Task<ItemResponse> CreateItemAsync(
+        string environmentId,
+        [Body] CreateItemRequest request,
+        CancellationToken cancellationToken = default);
+
+    [Put("/v2/projects/{environmentId}/items/{itemId}")]
+    Task<ItemResponse> UpdateItemAsync(
+        string environmentId,
+        string itemId,
+        [Body] UpdateItemRequest request,
+        CancellationToken cancellationToken = default);
+
+    [Delete("/v2/projects/{environmentId}/items/{itemId}")]
+    Task DeleteItemAsync(
+        string environmentId,
+        string itemId,
+        CancellationToken cancellationToken = default);
+}
+
+// 2. Options Configuration
 public class ManagementClientOptions : ClientOptions
 {
     public string? ManagementApiKey { get; set; }
     public bool UseProductionApi { get; set; } = true;
-    
+
     public override void Validate()
     {
         base.Validate();
         if (string.IsNullOrEmpty(ManagementApiKey))
-            throw new ArgumentException("Management API key is required.", nameof(ManagementApiKey));
+        {
+            throw new ArgumentException("Management API key is required.");
+        }
     }
 }
 
-// ManagementNamedClientOptions.cs - For factory scenarios
-public class ManagementNamedClientOptions : NamedClientOptions
-{
-    public string? ManagementApiKey { get; set; }
-    public bool UseProductionApi { get; set; } = true;
-    
-    public override void Validate()
-    {
-        base.Validate();
-        if (string.IsNullOrEmpty(ManagementApiKey))
-            throw new ArgumentException("Management API key is required.", nameof(ManagementApiKey));
-    }
-}
-
-// ManagementClient.cs  
+// 3. Client Implementation
 public class ManagementClient
 {
-    private readonly HttpClient _httpClient;
+    private readonly IManagementApi _api;
     private readonly ManagementClientOptions _options;
 
-    public ManagementClient(ManagementClientOptions options, HttpClient httpClient)
+    public ManagementClient(IManagementApi api, IOptions<ManagementClientOptions> options)
     {
-        _options = options ?? throw new ArgumentNullException(nameof(options));
-        _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
-        _options.Validate();
+        _api = api;
+        _options = options.Value;
     }
 
-    public async Task<ContentItem> CreateItemAsync<T>(T item, CancellationToken cancellationToken = default)
+    public async Task<ContentItem> CreateItemAsync(
+        CreateItemRequest request,
+        CancellationToken cancellationToken = default)
     {
-        var endpoint = $"/v1/projects/{_options.EnvironmentId}/items";
-        
-        var request = new HttpRequestMessage(HttpMethod.Post, endpoint);
-        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _options.ManagementApiKey);
-        request.Headers.Add("Content-Type", "application/json");
+        var response = await _api.CreateItemAsync(
+            _options.EnvironmentId,
+            request,
+            cancellationToken);
 
-        var json = JsonSerializer.Serialize(item, new JsonSerializerOptions 
-        { 
-            PropertyNamingPolicy = JsonNamingPolicy.CamelCase 
-        });
-        request.Content = new StringContent(json, Encoding.UTF8, "application/json");
+        return response.Item;
+    }
 
-        var response = await _httpClient.SendAsync(request, cancellationToken);
-        response.EnsureSuccessStatusCode();
-        
-        var responseJson = await response.Content.ReadAsStringAsync(cancellationToken);
-        return JsonSerializer.Deserialize<ContentItem>(responseJson, new JsonSerializerOptions 
-        { 
-            PropertyNamingPolicy = JsonNamingPolicy.CamelCase 
-        })!;
+    public async Task<ContentItem> UpdateItemAsync(
+        string itemId,
+        UpdateItemRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var response = await _api.UpdateItemAsync(
+            _options.EnvironmentId,
+            itemId,
+            request,
+            cancellationToken);
+
+        return response.Item;
+    }
+
+    public async Task DeleteItemAsync(
+        string itemId,
+        CancellationToken cancellationToken = default)
+    {
+        await _api.DeleteItemAsync(_options.EnvironmentId, itemId, cancellationToken);
     }
 }
 
-// ServiceCollectionExtensions.cs
+// 4. Registration Extensions
 public static class ServiceCollectionExtensions
 {
     public static IServiceCollection AddKontentManagement(
         this IServiceCollection services,
-        ManagementClientOptions options)
+        Action<ManagementClientOptions> configureOptions)
     {
-        services.AddCoreServices();
-        
-        return services.AddClient<ManagementClient, ManagementClientOptions>(
-            options,
-            (opts, httpClient) => new ManagementClient(opts, httpClient),
-            httpClientBuilder =>
+        services.AddClient<IManagementApi, ManagementClientOptions>(
+            configureOptions,
+            configureResilience: (builder, clientOptions) =>
             {
-                // Management API typically needs different retry strategy
-                if (!options.EnableDefaultResilience)
-                {
-                    httpClientBuilder.AddDefaultResilienceHandler(new ResilienceOptions
-                    {
-                        EnableRetry = true,
-                        EnableCircuitBreaker = true,
-                        EnableTimeout = true,
-                        Retry = new RetryOptions
-                        {
-                            MaxRetryAttempts = 2, // Fewer retries for write operations
-                            BaseDelay = TimeSpan.FromSeconds(3) // Longer delays
-                        }
-                    });
-                }
+                // Note: Default strategies (retry, timeout, circuit breaker) are already added
+                // For write operations, you might want to add additional conservative strategies
+                // or customize behavior based on client options
             });
+
+        services.AddTransient<ManagementClient>();
+        return services;
     }
 }
-```
 
-## 🔄 **Migration from Legacy Patterns**
-
-If you're migrating from inheritance-based factories to factory delegates:
-
-### **Before (Inheritance)**
-```csharp
-public class DeliveryClientFactory : ClientFactory<DeliveryClient, DeliveryClientOptions>
+// 5. Usage
+// Program.cs
+builder.Services.AddKontentManagement(options =>
 {
-    protected override DeliveryClient CreateClientInstance(IActionInvoker invoker, DeliveryClientOptions options)
+    options.EnvironmentId = "your-env-id";
+    options.BaseUrl = "https://manage.kontent.ai";
+    options.ManagementApiKey = "your-management-key";
+});
+
+// Service
+public class ContentService(ManagementClient managementClient)
+{
+    public async Task<ContentItem> CreateArticleAsync(string title, string content)
     {
-        return new DeliveryClient(invoker, options);
+        var request = new CreateItemRequest
+        {
+            Name = title,
+            Type = "article",
+            Elements = new[]
+            {
+                new ElementRequest { Element = "title", Value = title },
+                new ElementRequest { Element = "content", Value = content }
+            }
+        };
+
+        return await managementClient.CreateItemAsync(request);
     }
 }
 ```
 
-### **After (Factory Delegates)**
-```csharp
-services.AddMultipleClientFactory<DeliveryClient, DeliveryNamedClientOptions>(
-    (opts, httpClient) => new DeliveryClient(opts, httpClient), // Simple factory delegate with HttpClient
-    factory => { /* configure clients */ });
-```
+</details>
 
-### **Key Changes in Factory Delegates**
-1. **HttpClient Parameter**: Factory delegates now receive `HttpClient` directly: `Func<TOptions, HttpClient, TClient>`
-2. **Options Classes**: Use `NamedClientOptions` for factory scenarios to include `HttpClientName`
-3. **Simplified Configuration**: `EnableDefaultResilience` boolean instead of detailed retry configuration in options
-4. **Direct HttpClient Usage**: No need for `IActionInvoker` abstraction - use `HttpClient` methods directly
+## 🤝 **Contributing to the Architecture**
 
-## 🤝 **Contributing**
+This package represents our proposed direction for Kontent.ai .NET SDK v2. When reviewing this architecture:
 
-This package is the foundation for all Kontent.ai .NET SDKs. When contributing:
-
-1. **Maintain backward compatibility** with existing SDKs
-2. **Follow .NET 8 best practices** (file-scoped namespaces, primary constructors, etc.)
-3. **Test with multiple SDK scenarios** to ensure flexibility
-4. **Keep factory delegates simple** - avoid complex inheritance patterns
-5. **Document resilience behavior** clearly for SDK authors
+1. **Evaluate the Refit-centered approach** - Does this provide the right balance of simplicity and power?
+2. **Review the automatic infrastructure** - Are the defaults appropriate for most use cases?
+3. **Consider the developer experience** - How does this compare to manual HTTP client patterns?
+4. **Assess maintainability** - Will this architecture scale across multiple SDK packages?
 
 ## 📄 **License**
 

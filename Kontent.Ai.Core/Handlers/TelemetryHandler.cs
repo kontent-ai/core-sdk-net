@@ -1,7 +1,6 @@
 using Kontent.Ai.Core.Abstractions;
 using Kontent.Ai.Core.Configuration;
 using System.Diagnostics;
-using Microsoft.Extensions.Logging;
 
 namespace Kontent.Ai.Core.Handlers;
 
@@ -19,14 +18,14 @@ public sealed class TelemetryHandler : DelegatingHandler
     private readonly ILogger<TelemetryHandler> _logger;
     private readonly TelemetryExceptionBehavior _exceptionBehavior;
 
-    public TelemetryHandler(IApiUsageListener listener, ILogger<TelemetryHandler> logger, TelemetryExceptionBehavior exceptionBehavior)
+    public TelemetryHandler(IApiUsageListener listener, ILogger<TelemetryHandler> logger, IOptions<CoreOptions> coreOptions)
     {
         ArgumentNullException.ThrowIfNull(listener);
         ArgumentNullException.ThrowIfNull(logger);
 
         _listener = listener;
         _logger = logger;
-        _exceptionBehavior = exceptionBehavior;
+        _exceptionBehavior = coreOptions.Value.TelemetryExceptionBehavior;
     }
 
     protected override async Task<HttpResponseMessage> SendAsync(
@@ -48,7 +47,7 @@ public sealed class TelemetryHandler : DelegatingHandler
                 HandleTelemetryException(ex, "OnRequestStartAsync");
             }
 
-            response = await base.SendAsync(request, cancellationToken);
+            response = await base.SendAsync(request, cancellationToken).ConfigureAwait(false);
             return response;
         }
         catch (Exception ex)

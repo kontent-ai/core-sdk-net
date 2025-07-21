@@ -13,11 +13,9 @@ public static class HttpResponseHeadersExtensions
     /// <param name="headers">The HTTP response headers.</param>
     /// <returns>The continuation token if present; otherwise null.</returns>
     public static string? GetContinuationHeader(this HttpResponseHeaders headers)
-    {
-        return headers.TryGetValues(ContinuationHeaderName, out var headerValues)
+        => headers.TryGetValues(ContinuationHeaderName, out var headerValues)
             ? headerValues.FirstOrDefault()
             : null;
-    }
 
     /// <summary>
     /// Tries to get the retry-after value from response headers.

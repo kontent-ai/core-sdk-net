@@ -2,42 +2,8 @@ namespace Kontent.Ai.Core.Abstractions;
 
 /// <summary>
 /// Interface for listening to API usage events.
-/// Implementations can forward telemetry data to monitoring systems like ApplicationInsights.
+/// Implementations can forward telemetry data to monitoring systems.
 /// </summary>
-/// <example>
-/// <code>
-/// public class ApplicationInsightsApiUsageListener : IApiUsageListener
-/// {
-///     private readonly TelemetryClient _telemetryClient;
-///     
-///     public ApplicationInsightsApiUsageListener(TelemetryClient telemetryClient)
-///     {
-///         _telemetryClient = telemetryClient;
-///     }
-///     
-///     public Task OnRequestStartAsync(HttpRequestMessage request, CancellationToken cancellationToken = default)
-///     {
-///         _telemetryClient.TrackEvent("KontentApiRequestStart", new Dictionary&lt;string, string&gt;
-///         {
-///             ["method"] = request.Method.ToString(),
-///             ["uri"] = request.RequestUri?.ToString() ?? "unknown"
-///         });
-///         return Task.CompletedTask;
-///     }
-///     
-///     public Task OnRequestEndAsync(HttpRequestMessage request, HttpResponseMessage? response, Exception? exception, TimeSpan elapsed, CancellationToken cancellationToken = default)
-///     {
-///         _telemetryClient.TrackDependency("HTTP", request.RequestUri?.Host ?? "unknown", 
-///             request.RequestUri?.ToString() ?? "unknown", DateTimeOffset.UtcNow.Subtract(elapsed), 
-///             elapsed, response?.IsSuccessStatusCode ?? false);
-///         return Task.CompletedTask;
-///     }
-/// }
-/// 
-/// // Register with DI:
-/// services.AddCoreServices(new ApplicationInsightsApiUsageListener(telemetryClient));
-/// </code>
-/// </example>
 public interface IApiUsageListener
 {
     /// <summary>
