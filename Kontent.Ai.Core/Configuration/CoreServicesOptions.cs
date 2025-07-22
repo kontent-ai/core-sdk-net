@@ -18,6 +18,12 @@ public record CoreOptions(
 )
 {
     /// <summary>
+    /// Parameterless constructor for Microsoft.Extensions.Options compatibility.
+    /// </summary>
+    public CoreOptions() : this(null, null, TelemetryExceptionBehavior.LogAndContinue)
+    {
+    }
+    /// <summary>
     /// Creates default RefitSettings optimized for Kontent.ai APIs.
     /// Uses camelCase property naming, ignores null values, and enables other JSON features.
     /// </summary>

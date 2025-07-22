@@ -42,7 +42,7 @@ public static class ServiceCollectionExtensions
         Action<HttpClient>? configureHttpClient = null,
         Action<ResiliencePipelineBuilder<HttpResponseMessage>, TOptions>? configureResilience = null)
         where T : class
-        where TOptions : ClientOptions, new()
+        where TOptions : ClientOptions
     {
         services.AddCore();
         services.Configure(configureClientOptions);
@@ -97,7 +97,7 @@ public static class ServiceCollectionExtensions
         Action<HttpClient>? configureHttpClient = null,
         Action<ResiliencePipelineBuilder<HttpResponseMessage>, TOptions>? configureResilience = null)
         where T : class
-        where TOptions : ClientOptions, new()
+        where TOptions : ClientOptions
         => services.AddClient<T, TOptions>(
             configurationSection.Bind,
             configureRefit,
@@ -130,6 +130,12 @@ public static class ServiceCollectionExtensions
         {
             var opts = sp.GetRequiredService<IOptions<CoreOptions>>().Value;
             return opts.ApiUsageListener ?? DefaultApiUsageListener.Instance;
+        });
+
+        services.TryAddSingleton(sp =>
+        {
+            var opts = sp.GetRequiredService<IOptions<CoreOptions>>().Value;
+            return opts.SdkIdentity ?? SdkIdentity.Core;
         });
 
         services.TryAddSingleton<TelemetryHandler>();
