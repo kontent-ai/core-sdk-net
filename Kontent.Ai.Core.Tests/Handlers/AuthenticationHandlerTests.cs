@@ -9,4 +9,4 @@ public class AuthenticationHandlerTests
         var action = () => new AuthenticationHandler<TestClientOptions>(null!);
         action.Should().Throw<ArgumentNullException>();
     }
-} 
+}

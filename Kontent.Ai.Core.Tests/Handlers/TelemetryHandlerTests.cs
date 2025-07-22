@@ -14,4 +14,4 @@ public class TelemetryHandlerTests
         var action = () => new TelemetryHandler(listener.Object, logger.Object, coreOptions);
         action.Should().NotThrow();
     }
-} 
+}

@@ -32,4 +32,4 @@ public class HttpResponseHeadersExtensionsTests
         success.Should().BeTrue();
         retryAfter.Should().Be(expectedDelay);
     }
-} 
+}

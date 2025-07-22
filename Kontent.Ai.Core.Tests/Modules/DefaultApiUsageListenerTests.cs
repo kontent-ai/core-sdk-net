@@ -51,4 +51,4 @@ public class DefaultApiUsageListenerTests
         await task;
         task.IsCompletedSuccessfully.Should().BeTrue();
     }
-} 
+}

@@ -32,4 +32,4 @@ public class HttpRequestHeadersExtensionsTests
         request.Headers.Authorization!.Scheme.Should().Be("Bearer");
         request.Headers.Authorization.Parameter.Should().Be("test-token");
     }
-} 
+}

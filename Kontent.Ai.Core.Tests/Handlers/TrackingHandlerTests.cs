@@ -20,4 +20,4 @@ public class TrackingHandlerTests
         var action = () => new TrackingHandler(null!);
         action.Should().Throw<ArgumentNullException>();
     }
-} 
+}

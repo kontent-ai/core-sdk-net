@@ -22,4 +22,4 @@ public class CoreOptionsTests
         settings.Should().NotBeNull();
         settings.ContentSerializer.Should().NotBeNull();
     }
-} 
+}

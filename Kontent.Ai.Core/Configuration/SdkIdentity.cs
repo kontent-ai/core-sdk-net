@@ -20,7 +20,7 @@ public record SdkIdentity(string Name, Version Version)
     public string ToTrackingString(string packageRepositoryHost = "nuget.org") =>
         $"{packageRepositoryHost};{Name};{Version}";
 
-    private static readonly Lazy<SdkIdentity> _coreIdentity = new(() => 
+    private static readonly Lazy<SdkIdentity> _coreIdentity = new(() =>
         new("Kontent.Ai.Core", GetCoreVersion()));
 
     private static readonly Lazy<Version> _coreVersion = new(() =>

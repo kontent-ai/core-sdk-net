@@ -44,4 +44,4 @@ public class SdkIdentityTests
         // Assert
         result.Should().Be(expected);
     }
-} 
+}

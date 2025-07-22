@@ -6,4 +6,4 @@ namespace Kontent.Ai.Core.Tests.TestHelpers;
 public class TestClientOptions : ClientOptions
 {
     // Required members will be set via object initializer
-} 
+}

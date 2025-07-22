@@ -35,4 +35,4 @@ public class SourceTrackingHeaderAttributeTests
         attribute.PackageName.Should().Be(packageName);
         attribute.LoadFromAssembly.Should().BeTrue();
     }
-} 
+}

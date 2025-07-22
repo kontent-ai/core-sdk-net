@@ -36,4 +36,4 @@ public class FakeLogCollector
     }
 }
 
-public record LogEntry(LogLevel Level, EventId EventId, string Message, Exception? Exception); 
+public record LogEntry(LogLevel Level, EventId EventId, string Message, Exception? Exception);

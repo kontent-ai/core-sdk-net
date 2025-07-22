@@ -36,4 +36,4 @@ public class ClientOptionsTests
         // Assert
         options.EnableResilience.Should().BeTrue();
     }
-} 
+}
