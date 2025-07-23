@@ -119,6 +119,16 @@ using Kontent.Ai.Core.Configuration;
 public class DeliveryClientOptions : ClientOptions
 {
     /// <summary>
+    /// Production endpoint for delivery API.
+    /// </summary>
+    public string ProductionEndpoint { get; set; } = "https://deliver.kontent.ai";
+    
+    /// <summary>
+    /// Preview endpoint for delivery API.
+    /// </summary>
+    public string PreviewEndpoint { get; set; } = "https://preview-deliver.kontent.ai";
+
+    /// <summary>
     /// Whether to use the Preview API for unpublished content.
     /// </summary>
     public bool UsePreviewApi { get; set; } = false;
@@ -127,15 +137,30 @@ public class DeliveryClientOptions : ClientOptions
     /// Preview API key (required when UsePreviewApi is true).
     /// </summary>
     public string? PreviewApiKey { get; set; }
+    
+    /// <summary>
+    /// Secure access API key for production endpoint.
+    /// </summary>
+    public string? SecureAccessApiKey { get; set; }
 
     /// <summary>
     /// Whether to include total count in listing responses.
     /// </summary>
     public bool IncludeTotalCount { get; set; } = false;
 
+    public override string GetBaseUrl(object? requestContext = null)
+    {
+        return UsePreviewApi ? PreviewEndpoint : ProductionEndpoint;
+    }
+
+    public override string? GetApiKey(object? requestContext = null)
+    {
+        return UsePreviewApi ? PreviewApiKey : SecureAccessApiKey;
+    }
+
     public override void Validate()
     {
-        base.Validate(); // Validates EnvironmentId, BaseUrl, etc.
+        base.Validate(); // Validates EnvironmentId
 
         if (UsePreviewApi && string.IsNullOrEmpty(PreviewApiKey))
         {
@@ -148,14 +173,29 @@ public class DeliveryClientOptions : ClientOptions
 public class ManagementClientOptions : ClientOptions
 {
     /// <summary>
+    /// Management API endpoint.
+    /// </summary>
+    public string ManagementEndpoint { get; set; } = "https://manage.kontent.ai";
+
+    /// <summary>
     /// Management API key for write operations.
     /// </summary>
-    public string? ManagementApiKey { get; set; }
+    public required string ManagementApiKey { get; set; }
 
     /// <summary>
     /// Whether to use the production Management API endpoint.
     /// </summary>
     public bool UseProductionApi { get; set; } = true;
+
+    public override string GetBaseUrl(object? requestContext = null)
+    {
+        return ManagementEndpoint;
+    }
+
+    public override string? GetApiKey(object? requestContext = null)
+    {
+        return ManagementApiKey;
+    }
 
     public override void Validate()
     {
@@ -356,14 +396,16 @@ public abstract class ClientOptions
     public required string EnvironmentId { get; set; }
 
     /// <summary>
-    /// The base URL for the Kontent.ai API (required).
+    /// Gets the base URL for the current request context.
+    /// Each SDK implements this to return the appropriate endpoint.
     /// </summary>
-    public required string BaseUrl { get; set; }
+    public abstract string GetBaseUrl(object? requestContext = null);
 
     /// <summary>
-    /// API key for authentication (automatically applied as Bearer token).
+    /// Gets the API key for the current request context.
+    /// Each SDK implements this to return the appropriate API key.
     /// </summary>
-    public string? ApiKey { get; set; }
+    public abstract string? GetApiKey(object? requestContext = null);
 
     /// <summary>
     /// Gets or sets whether to enable resilience handling (default: true).
@@ -388,8 +430,8 @@ public abstract class ClientOptions
 builder.Services.AddKontentDelivery(options =>
 {
     options.EnvironmentId = "your-environment-id";
-    options.BaseUrl = "https://deliver.kontent.ai";
     options.UsePreviewApi = false;
+    // BaseUrl is automatically determined by GetBaseUrl() implementation
 });
 
 // Usage in controllers/services
@@ -410,7 +452,6 @@ public class ProductController(DeliveryClient deliveryClient)
 builder.Services.AddKontentDelivery(options =>
 {
     options.EnvironmentId = "your-environment-id";
-    options.BaseUrl = "https://deliver.kontent.ai";
     options.EnableResilience = false; // Disables retry, circuit breaker, and timeout policies
 });
 ```
@@ -423,12 +464,11 @@ builder.Services.AddKontentDelivery(options =>
   "Kontent": {
     "Delivery": {
       "EnvironmentId": "your-env-id",
-      "BaseUrl": "https://deliver.kontent.ai",
-      "UsePreviewApi": false
+      "UsePreviewApi": false,
+      "PreviewApiKey": "your-preview-key"
     },
     "Management": {
       "EnvironmentId": "your-env-id", 
-      "BaseUrl": "https://manage.kontent.ai",
       "ManagementApiKey": "your-management-key"
     }
   }
@@ -496,19 +536,20 @@ var refitSettings = new RefitSettings
 
 ### **Authentication Handling**
 
-Authentication is **completely automatic** - just set `ApiKey` in your options:
+Authentication is **completely automatic** - just configure your SDK-specific API keys:
 
 ```csharp
 // For Delivery API (Preview)
 services.AddKontentDelivery(options =>
 {
-    options.ApiKey = "your-preview-api-key"; // Automatically becomes "Bearer your-preview-api-key"
+    options.UsePreviewApi = true;
+    options.PreviewApiKey = "your-preview-api-key"; // Automatically becomes "Bearer your-preview-api-key"
 });
 
 // For Management API
 services.AddKontentManagement(options =>
 {
-    options.ApiKey = "your-management-api-key"; // Automatically becomes "Bearer your-management-api-key"
+    options.ManagementApiKey = "your-management-api-key"; // Automatically becomes "Bearer your-management-api-key"
 });
 ```
 
@@ -780,7 +821,6 @@ public static class ServiceCollectionExtensions
 builder.Services.AddKontentDelivery(options =>
 {
     options.EnvironmentId = "your-env-id";
-    options.BaseUrl = "https://deliver.kontent.ai";
     options.UsePreviewApi = true;
     options.PreviewApiKey = "your-preview-key";
 });
@@ -920,7 +960,6 @@ public static class ServiceCollectionExtensions
 builder.Services.AddKontentManagement(options =>
 {
     options.EnvironmentId = "your-env-id";
-    options.BaseUrl = "https://manage.kontent.ai";
     options.ManagementApiKey = "your-management-key";
 });
 

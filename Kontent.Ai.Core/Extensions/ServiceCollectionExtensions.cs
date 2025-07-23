@@ -59,7 +59,7 @@ public static class ServiceCollectionExtensions
             .ConfigureHttpClient((sp, httpClient) =>
             {
                 var options = sp.GetRequiredService<TOptions>();
-                httpClient.BaseAddress = new Uri(options.BaseUrl);
+                httpClient.BaseAddress = new Uri(options.GetBaseUrl());
                 configureHttpClient?.Invoke(httpClient);
             })
             .AddRequestHandlers<TOptions>()

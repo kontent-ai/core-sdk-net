@@ -13,16 +13,22 @@ public abstract class ClientOptions
     public required string EnvironmentId { get; set; }
 
     /// <summary>
-    /// Gets or sets the base URL for the Kontent.ai API.
-    /// This property is required and must be provided during initialization.
+    /// Gets the base URL for the current request context.
+    /// Each SDK should implement this method to return the appropriate endpoint
+    /// based on their specific requirements (e.g., preview vs production, management vs delivery).
     /// </summary>
-    public required string BaseUrl { get; set; }
+    /// <param name="requestContext">Optional context information about the current request.</param>
+    /// <returns>The base URL to use for HTTP requests.</returns>
+    public abstract string GetBaseUrl(object? requestContext = null);
 
     /// <summary>
-    /// Gets or sets the API key for authentication.
-    /// This is automatically applied to HTTP requests by the AuthenticationHandler with Bearer scheme.
+    /// Gets the API key for the current request context.
+    /// Each SDK should implement this method to return the appropriate API key
+    /// based on their specific requirements (e.g., preview key vs secure access key).
     /// </summary>
-    public string? ApiKey { get; set; }
+    /// <param name="requestContext">Optional context information about the current request.</param>
+    /// <returns>The API key to use for authentication, or null if no authentication is required.</returns>
+    public abstract string? GetApiKey(object? requestContext = null);
 
     /// <summary>
     /// Gets or sets a value indicating whether to enable resilience handling.

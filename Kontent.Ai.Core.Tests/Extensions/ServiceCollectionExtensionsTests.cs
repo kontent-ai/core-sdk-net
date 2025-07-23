@@ -12,11 +12,18 @@ public class ServiceCollectionExtensionsTests
     /// </summary>
     public class DeliveryClientOptions : ClientOptions
     {
-        // Inherits required EnvironmentId and BaseUrl from ClientOptions
+        // Inherits required EnvironmentId from ClientOptions
         // This class can now be used with AddClient without the new() constraint issue
 
+        public string BaseUrl { get; set; } = string.Empty;
+        public string? ApiKey { get; set; }
         public string? PreviewApiKey { get; set; }
         public bool UsePreviewMode { get; set; } = false;
+
+        public override string GetBaseUrl(object? requestContext = null) => BaseUrl;
+
+        public override string? GetApiKey(object? requestContext = null) 
+            => UsePreviewMode ? PreviewApiKey : ApiKey;
     }
 
     public interface ITestDeliveryClient
