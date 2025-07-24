@@ -32,7 +32,7 @@ public static class ClientOptionsExtensions
     /// <param name="requestContext">Optional context information about the current request.</param>
     /// <returns>The base URL to use for HTTP requests.</returns>
     /// <exception cref="NotImplementedException">Always thrown - SDKs must implement their own GetBaseUrl extension.</exception>
-    public static string GetBaseUrl(this ClientOptions options, object? requestContext = null)
+    public static string GetBaseUrl(this ClientOptions options)
     {
         throw new NotImplementedException($"GetBaseUrl extension method not implemented for {options.GetType().Name}. SDKs must implement their own GetBaseUrl extension method.");
     }
@@ -45,7 +45,7 @@ public static class ClientOptionsExtensions
     /// <param name="requestContext">Optional context information about the current request.</param>
     /// <returns>The API key to use for authentication, or null if no authentication is required.</returns>
     /// <exception cref="NotImplementedException">Always thrown - SDKs must implement their own GetApiKey extension.</exception>
-    public static string? GetApiKey(this ClientOptions options, object? requestContext = null)
+    public static string? GetApiKey(this ClientOptions options)
     {
         throw new NotImplementedException($"GetApiKey extension method not implemented for {options.GetType().Name}. SDKs must implement their own GetApiKey extension method.");
     }

@@ -54,7 +54,7 @@ public sealed class AuthenticationHandler<TOptions> : DelegatingHandler
             : _clientOptionsMonitor.Get(_optionsName);
 
         // Add authorization header if API key is configured
-        var apiKey = clientOptions?.GetApiKey(request);
+        var apiKey = clientOptions?.GetApiKey();
         if (!string.IsNullOrWhiteSpace(apiKey))
         {
             request.Headers.AddAuthorizationHeader("Bearer", apiKey);
