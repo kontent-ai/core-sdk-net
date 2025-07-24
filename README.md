@@ -116,7 +116,7 @@ Define strongly-typed configuration options that extend the base `ClientOptions`
 using Kontent.Ai.Core.Configuration;
 
 // Delivery SDK Options
-public class DeliveryClientOptions : ClientOptions
+public record DeliveryClientOptions : ClientOptions
 {
     /// <summary>
     /// Production endpoint for delivery API.
@@ -147,30 +147,35 @@ public class DeliveryClientOptions : ClientOptions
     /// Whether to include total count in listing responses.
     /// </summary>
     public bool IncludeTotalCount { get; set; } = false;
+}
 
-    public override string GetBaseUrl(object? requestContext = null)
+// Extension methods for DeliveryClientOptions
+public static class DeliveryClientOptionsExtensions
+{
+    public static string GetBaseUrl(this DeliveryClientOptions options, object? requestContext = null)
     {
-        return UsePreviewApi ? PreviewEndpoint : ProductionEndpoint;
+        return options.UsePreviewApi ? options.PreviewEndpoint : options.ProductionEndpoint;
     }
 
-    public override string? GetApiKey(object? requestContext = null)
+    public static string? GetApiKey(this DeliveryClientOptions options, object? requestContext = null)
     {
-        return UsePreviewApi ? PreviewApiKey : SecureAccessApiKey;
+        return options.UsePreviewApi ? options.PreviewApiKey : options.SecureAccessApiKey;
     }
 
-    public override void Validate()
+    public static void Validate(this DeliveryClientOptions options)
     {
-        base.Validate(); // Validates EnvironmentId
+        // Call base validation for EnvironmentId
+        ((ClientOptions)options).Validate();
 
-        if (UsePreviewApi && string.IsNullOrEmpty(PreviewApiKey))
+        if (options.UsePreviewApi && string.IsNullOrEmpty(options.PreviewApiKey))
         {
-            throw new ArgumentException("Preview API key is required when UsePreviewApi is true.", nameof(PreviewApiKey));
+            throw new ArgumentException("Preview API key is required when UsePreviewApi is true.", nameof(options.PreviewApiKey));
         }
     }
 }
 
 // Management SDK Options  
-public class ManagementClientOptions : ClientOptions
+public record ManagementClientOptions : ClientOptions
 {
     /// <summary>
     /// Management API endpoint.
@@ -186,24 +191,29 @@ public class ManagementClientOptions : ClientOptions
     /// Whether to use the production Management API endpoint.
     /// </summary>
     public bool UseProductionApi { get; set; } = true;
+}
 
-    public override string GetBaseUrl(object? requestContext = null)
+// Extension methods for ManagementClientOptions
+public static class ManagementClientOptionsExtensions
+{
+    public static string GetBaseUrl(this ManagementClientOptions options, object? requestContext = null)
     {
-        return ManagementEndpoint;
+        return options.ManagementEndpoint;
     }
 
-    public override string? GetApiKey(object? requestContext = null)
+    public static string? GetApiKey(this ManagementClientOptions options, object? requestContext = null)
     {
-        return ManagementApiKey;
+        return options.ManagementApiKey;
     }
 
-    public override void Validate()
+    public static void Validate(this ManagementClientOptions options)
     {
-        base.Validate();
+        // Call base validation for EnvironmentId
+        ((ClientOptions)options).Validate();
         
-        if (string.IsNullOrEmpty(ManagementApiKey))
+        if (string.IsNullOrEmpty(options.ManagementApiKey))
         {
-            throw new ArgumentException("Management API key is required.", nameof(ManagementApiKey));
+            throw new ArgumentException("Management API key is required.", nameof(options.ManagementApiKey));
         }
     }
 }
@@ -388,7 +398,7 @@ HTTP Request → Authentication → Tracking → Telemetry → Resilience → Re
 All SDK options inherit from this foundation:
 
 ```csharp
-public abstract class ClientOptions
+public abstract record ClientOptions
 {
     /// <summary>
     /// Your Kontent.ai environment identifier (required).
@@ -396,28 +406,90 @@ public abstract class ClientOptions
     public required string EnvironmentId { get; set; }
 
     /// <summary>
-    /// Gets the base URL for the current request context.
-    /// Each SDK implements this to return the appropriate endpoint.
-    /// </summary>
-    public abstract string GetBaseUrl(object? requestContext = null);
-
-    /// <summary>
-    /// Gets the API key for the current request context.
-    /// Each SDK implements this to return the appropriate API key.
-    /// </summary>
-    public abstract string? GetApiKey(object? requestContext = null);
-
-    /// <summary>
     /// Gets or sets whether to enable resilience handling (default: true).
     /// When false, no retry, circuit breaker, or timeout policies are applied.
     /// </summary>
     public bool EnableResilience { get; set; } = true;
+}
+
+/// <summary>
+/// Extension methods for client options that provide base URL and API key resolution.
+/// SDKs should implement these extension methods for their specific options types.
+/// </summary>
+public static class ClientOptionsExtensions
+{
+    /// <summary>
+    /// Gets the base URL for the specified client options.
+    /// SDKs must implement their own GetBaseUrl extension method.
+    /// </summary>
+    public static string GetBaseUrl(this ClientOptions options, object? requestContext = null)
+    {
+        throw new NotImplementedException($"GetBaseUrl extension method not implemented for {options.GetType().Name}");
+    }
+
+    /// <summary>
+    /// Gets the API key for the specified client options.
+    /// SDKs must implement their own GetApiKey extension method.
+    /// </summary>
+    public static string? GetApiKey(this ClientOptions options, object? requestContext = null)
+    {
+        throw new NotImplementedException($"GetApiKey extension method not implemented for {options.GetType().Name}");
+    }
 
     /// <summary>
     /// Validates the client options configuration.
-    /// Override this in derived classes to add custom validation.
+    /// SDKs can call this base validation and add their own custom validation.
     /// </summary>
-    public virtual void Validate() { /* Implementation */ }
+    public static void Validate(this ClientOptions options)
+    {
+        if (string.IsNullOrWhiteSpace(options.EnvironmentId))
+            throw new InvalidOperationException("EnvironmentId is required");
+    }
+}
+```
+
+### **Extension Method Pattern for SDK Implementation**
+
+The core package uses an **extension method pattern** for `GetBaseUrl()`, `GetApiKey()`, and `Validate()` methods instead of abstract methods. This provides several benefits:
+
+#### **✅ Benefits of Extension Methods**
+- **Flexibility**: SDKs can implement different method signatures if needed
+- **Testability**: Extension methods are easier to mock and test
+- **Immutable Records**: Works perfectly with `record` types that are immutable
+- **Optional Implementation**: SDKs only implement the methods they actually need
+
+#### **🔧 How to Implement Extension Methods**
+
+```csharp
+// 1. Define your options as a record
+public record MyClientOptions : ClientOptions
+{
+    public string ApiKey { get; set; } = "";
+    public string BaseUrl { get; set; } = "https://api.example.com";
+}
+
+// 2. Create extension methods for your specific options type
+public static class MyClientOptionsExtensions  
+{
+    public static string GetBaseUrl(this MyClientOptions options, object? requestContext = null)
+    {
+        return options.BaseUrl;
+    }
+
+    public static string? GetApiKey(this MyClientOptions options, object? requestContext = null)
+    {
+        return options.ApiKey;
+    }
+
+    public static void Validate(this MyClientOptions options)
+    {
+        // Call base validation first
+        ((ClientOptions)options).Validate();
+        
+        // Add your custom validation
+        if (string.IsNullOrEmpty(options.ApiKey))
+            throw new ArgumentException("API key is required");
+    }
 }
 ```
 
@@ -748,16 +820,20 @@ public interface IDeliveryApi
 }
 
 // 2. Options Configuration
-public class DeliveryClientOptions : ClientOptions
+public record DeliveryClientOptions : ClientOptions
 {
     public bool UsePreviewApi { get; set; } = false;
     public string? PreviewApiKey { get; set; }
     public bool IncludeTotalCount { get; set; } = false;
+}
 
-    public override void Validate()
+// Extension methods for DeliveryClientOptions
+public static class DeliveryClientOptionsExtensions
+{
+    public static void Validate(this DeliveryClientOptions options)
     {
-        base.Validate();
-        if (UsePreviewApi && string.IsNullOrEmpty(PreviewApiKey))
+        ((ClientOptions)options).Validate();
+        if (options.UsePreviewApi && string.IsNullOrEmpty(options.PreviewApiKey))
         {
             throw new ArgumentException("Preview API key is required when UsePreviewApi is true.");
         }
@@ -873,15 +949,19 @@ public interface IManagementApi
 }
 
 // 2. Options Configuration
-public class ManagementClientOptions : ClientOptions
+public record ManagementClientOptions : ClientOptions
 {
     public string? ManagementApiKey { get; set; }
     public bool UseProductionApi { get; set; } = true;
+}
 
-    public override void Validate()
+// Extension methods for ManagementClientOptions
+public static class ManagementClientOptionsExtensions
+{
+    public static void Validate(this ManagementClientOptions options)
     {
-        base.Validate();
-        if (string.IsNullOrEmpty(ManagementApiKey))
+        ((ClientOptions)options).Validate();
+        if (string.IsNullOrEmpty(options.ManagementApiKey))
         {
             throw new ArgumentException("Management API key is required.");
         }

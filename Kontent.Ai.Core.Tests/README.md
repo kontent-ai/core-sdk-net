@@ -29,7 +29,7 @@ Kontent.Ai.Core.Tests/
 ## Test Coverage
 
 ### ✅ Configuration Tests (6 tests)
-- **ClientOptions**: Validation logic for required properties, default values
+- **ClientOptions**: Validation logic for required properties, default values (using record-based architecture)
 - **CoreOptions**: Default constructor behavior, RefitSettings creation
 - **SdkIdentity**: Constructor validation, Core singleton, tracking string formatting
 
@@ -48,8 +48,10 @@ Kontent.Ai.Core.Tests/
 ### ✅ Module Tests (4 tests)
 - **DefaultApiUsageListener**: Singleton behavior, no-op async methods
 
-### ✅ Core Business Logic (5 additional tests)
+### ✅ Core Business Logic (6 additional tests)
 - Various edge cases and parameter validation across components
+
+**Total: 25 passing tests** (adjusted for record-based ClientOptions architecture)
 
 ## Architecture Notes
 
