@@ -4,7 +4,7 @@ namespace Kontent.Ai.Core.Configuration;
 /// Base configuration options for Kontent.ai clients.
 /// SDKs should inherit from this class to create their specific options.
 /// </summary>
-public abstract class ClientOptions
+public abstract record ClientOptions
 {
     /// <summary>
     /// Gets or sets the Kontent.ai environment identifier.
@@ -13,35 +13,51 @@ public abstract class ClientOptions
     public required string EnvironmentId { get; set; }
 
     /// <summary>
-    /// Gets the base URL for the current request context.
-    /// Each SDK should implement this method to return the appropriate endpoint
-    /// based on their specific requirements (e.g., preview vs production, management vs delivery).
-    /// </summary>
-    /// <param name="requestContext">Optional context information about the current request.</param>
-    /// <returns>The base URL to use for HTTP requests.</returns>
-    public abstract string GetBaseUrl(object? requestContext = null);
-
-    /// <summary>
-    /// Gets the API key for the current request context.
-    /// Each SDK should implement this method to return the appropriate API key
-    /// based on their specific requirements (e.g., preview key vs secure access key).
-    /// </summary>
-    /// <param name="requestContext">Optional context information about the current request.</param>
-    /// <returns>The API key to use for authentication, or null if no authentication is required.</returns>
-    public abstract string? GetApiKey(object? requestContext = null);
-
-    /// <summary>
     /// Gets or sets a value indicating whether to enable resilience handling.
     /// </summary>
     public bool EnableResilience { get; set; } = true;
+}
+
+/// <summary>
+/// Extension methods for client options that provide base URL and API key resolution.
+/// SDKs should implement these extension methods for their specific options types.
+/// </summary>
+public static class ClientOptionsExtensions
+{
+    /// <summary>
+    /// Gets the base URL for the specified client options.
+    /// This is a placeholder method - SDKs should implement their own extension methods.
+    /// </summary>
+    /// <param name="options">The client options instance.</param>
+    /// <param name="requestContext">Optional context information about the current request.</param>
+    /// <returns>The base URL to use for HTTP requests.</returns>
+    /// <exception cref="NotImplementedException">Always thrown - SDKs must implement their own GetBaseUrl extension.</exception>
+    public static string GetBaseUrl(this ClientOptions options, object? requestContext = null)
+    {
+        throw new NotImplementedException($"GetBaseUrl extension method not implemented for {options.GetType().Name}. SDKs must implement their own GetBaseUrl extension method.");
+    }
+
+    /// <summary>
+    /// Gets the API key for the specified client options.
+    /// This is a placeholder method - SDKs should implement their own extension methods.
+    /// </summary>
+    /// <param name="options">The client options instance.</param>
+    /// <param name="requestContext">Optional context information about the current request.</param>
+    /// <returns>The API key to use for authentication, or null if no authentication is required.</returns>
+    /// <exception cref="NotImplementedException">Always thrown - SDKs must implement their own GetApiKey extension.</exception>
+    public static string? GetApiKey(this ClientOptions options, object? requestContext = null)
+    {
+        throw new NotImplementedException($"GetApiKey extension method not implemented for {options.GetType().Name}. SDKs must implement their own GetApiKey extension method.");
+    }
 
     /// <summary>
     /// Validates the client options.
     /// </summary>
+    /// <param name="options">The client options instance.</param>
     /// <exception cref="InvalidOperationException">Thrown when the client options are invalid.</exception>
-    public virtual void Validate()
+    public static void Validate(this ClientOptions options)
     {
-        if (string.IsNullOrWhiteSpace(EnvironmentId))
+        if (string.IsNullOrWhiteSpace(options.EnvironmentId))
         {
             throw new InvalidOperationException("EnvironmentId is required");
         }
